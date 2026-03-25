@@ -4,7 +4,7 @@ Authentication service - Async compatible
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
@@ -13,22 +13,16 @@ import uuid
 
 settings = get_settings()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 class AuthService:
     @staticmethod
-    def _truncate_password(password: str) -> str:
-        """Truncate password to 72 bytes (bcrypt's maximum)."""
-        return password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-
-    @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(AuthService._truncate_password(plain_password), hashed_password)
+        pw_bytes = plain_password.encode("utf-8")[:72]
+        return bcrypt.checkpw(pw_bytes, hashed_password.encode("utf-8"))
 
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return pwd_context.hash(AuthService._truncate_password(password))
+        pw_bytes = password.encode("utf-8")[:72]
+        return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode("utf-8")
 
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
