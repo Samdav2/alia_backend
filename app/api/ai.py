@@ -2,7 +2,7 @@
 AI service API routes
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.ai import (
     ChatRequest, ChatResponse, SimplifyRequest, SimplifyResponse,
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/ai", tags=["AI Services"])
 async def chat_with_ai(
     chat_request: ChatRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Send message to AI assistant"""
     

@@ -2,7 +2,7 @@
 Progress tracking API routes
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.progress import ProgressResponse, TopicProgressUpdate
 from app.services.progress_service import ProgressService
@@ -16,18 +16,18 @@ router = APIRouter(prefix="/api/progress", tags=["Progress Tracking"])
 async def get_course_progress(
     course_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get course progress"""
-    
-    progress = ProgressService.get_course_progress(db, str(current_user.id), course_id)
+
+    progress = await ProgressService.get_course_progress(db, str(current_user.id), course_id)
     if not progress:
         # Create initial progress record
-        progress = ProgressService.create_or_update_progress(db, str(current_user.id), course_id)
-    
+        progress = await ProgressService.create_or_update_progress(db, str(current_user.id), course_id)
+
     # Get topic progress
-    topic_progress = ProgressService.get_topic_progress_list(db, progress.id)
-    
+    topic_progress = await ProgressService.get_topic_progress_list(db, progress.id)
+
     return {
         "success": True,
         "data": {
@@ -50,17 +50,17 @@ async def update_topic_progress(
     topic_id: str,
     progress_update: TopicProgressUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update topic progress"""
-    
-    topic_progress = ProgressService.update_topic_progress(
+
+    topic_progress = await ProgressService.update_topic_progress(
         db, str(current_user.id), course_id, topic_id, progress_update
     )
-    
+
     if not topic_progress:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
+
     return {
         "success": True,
         "data": {

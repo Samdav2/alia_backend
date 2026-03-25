@@ -1,11 +1,13 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 import enum
 import uuid
 from app.database import Base
 from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean, Text, Enum, func
+
+if TYPE_CHECKING:
+    from .user import User
 
 class NotificationType(str, enum.Enum):
     COURSE_UPDATE = "course_update"

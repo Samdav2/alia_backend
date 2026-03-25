@@ -1,10 +1,12 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
 import uuid
 from app.database import Base
 from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, func
+
+if TYPE_CHECKING:
+    from .user import User
 
 class AuditLog(Base, table=True):
     __tablename__ = "audit_logs"

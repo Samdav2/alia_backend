@@ -1,10 +1,12 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 import uuid
 from app.database import Base
 from sqlalchemy import Column, String, Text, ForeignKey, Boolean, DateTime, func
+
+if TYPE_CHECKING:
+    from .user import User
 
 class Announcement(Base, table=True):
     __tablename__ = "announcements"

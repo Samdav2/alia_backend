@@ -2,7 +2,7 @@
 Admin API routes
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from app.database import get_db
 from app.services.analytics_service import AnalyticsService
@@ -18,11 +18,11 @@ router = APIRouter(prefix="/api/admin", tags=["Administration"])
 @router.get("/dashboard", response_model=dict)
 async def get_admin_dashboard(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get admin dashboard data"""
     
-    dashboard_data = AnalyticsService.get_admin_dashboard_stats(db)
+    dashboard_data = await AnalyticsService.get_admin_dashboard_stats(db)
     
     return {
         "success": True,
@@ -34,15 +34,15 @@ async def get_admin_dashboard(
 async def get_user_accessibility_report(
     user_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get user accessibility report"""
     
-    user = UserService.get_user_profile(db, user_id)
+    user = await UserService.get_user_profile(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    accessibility_data = AnalyticsService.get_accessibility_analytics(db, user_id)
+    accessibility_data = await AnalyticsService.get_accessibility_analytics(db, user_id)
     
     return {
         "success": True,
@@ -64,11 +64,11 @@ async def get_all_users(
     search: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all users with filters"""
     skip = (page - 1) * limit
-    users, total = AdminService.get_all_users(db, skip, limit, role, search, is_active)
+    users, total = await AdminService.get_all_users(db, skip, limit, role, search, is_active)
     
     total_pages = (total + limit - 1) // limit
     
@@ -90,10 +90,10 @@ async def get_all_users(
 async def create_user(
     user_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new user"""
-    user = AdminService.create_user(db, user_data)
+    user = await AdminService.create_user(db, user_data)
     
     return {
         "success": True,
@@ -107,10 +107,10 @@ async def update_user(
     user_id: str,
     user_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a user"""
-    user = AdminService.update_user(db, user_id, user_data)
+    user = await AdminService.update_user(db, user_id, user_data)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -125,10 +125,10 @@ async def update_user(
 async def delete_user(
     user_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a user"""
-    success = AdminService.delete_user(db, user_id)
+    success = await AdminService.delete_user(db, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -142,10 +142,10 @@ async def delete_user(
 async def bulk_user_action(
     action_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Perform bulk action on users"""
-    success = AdminService.bulk_user_action(
+    success = await AdminService.bulk_user_action(
         db,
         action_data.get("user_ids", []),
         action_data.get("action"),
@@ -169,11 +169,11 @@ async def get_all_courses(
     status: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all courses with admin view"""
     skip = (page - 1) * limit
-    courses, total = AdminService.get_all_courses_admin(db, skip, limit, status, department)
+    courses, total = await AdminService.get_all_courses_admin(db, skip, limit, status, department)
     
     total_pages = (total + limit - 1) // limit
     
@@ -195,7 +195,7 @@ async def get_all_courses(
 async def approve_course(
     course_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Approve a course"""
     # Validate UUID format
@@ -204,7 +204,7 @@ async def approve_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = AdminService.approve_course(db, course_id)
+    success = await AdminService.approve_course(db, course_id)
     if not success:
         raise HTTPException(status_code=404, detail="Course not found")
     
@@ -218,7 +218,7 @@ async def approve_course(
 async def reject_course(
     course_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Reject a course"""
     # Validate UUID format
@@ -227,7 +227,7 @@ async def reject_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = AdminService.reject_course(db, course_id)
+    success = await AdminService.reject_course(db, course_id)
     if not success:
         raise HTTPException(status_code=404, detail="Course not found")
     
@@ -242,7 +242,7 @@ async def change_course_status(
     course_id: str,
     status_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Change course status (draft/published)"""
     # Validate UUID format
@@ -251,7 +251,7 @@ async def change_course_status(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = AdminService.change_course_status(
+    success = await AdminService.change_course_status(
         db, 
         course_id, 
         status_data.get("status", "published")
@@ -273,7 +273,7 @@ async def feature_course(
     course_id: str,
     feature_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Feature or unfeature a course"""
     # Validate UUID format
@@ -282,7 +282,7 @@ async def feature_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = AdminService.feature_course(db, course_id, feature_data.get("featured", True))
+    success = await AdminService.feature_course(db, course_id, feature_data.get("featured", True))
     if not success:
         raise HTTPException(status_code=404, detail="Course not found")
     
@@ -296,10 +296,10 @@ async def feature_course(
 @router.get("/statistics")
 async def get_system_statistics(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get system-wide statistics"""
-    stats = AdminService.get_system_statistics(db)
+    stats = await AdminService.get_system_statistics(db)
     
     return {
         "success": True,
@@ -310,10 +310,10 @@ async def get_system_statistics(
 @router.get("/accessibility-report")
 async def get_accessibility_report(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get system-wide accessibility report"""
-    report = AdminService.get_accessibility_report(db)
+    report = await AdminService.get_accessibility_report(db)
     
     return {
         "success": True,
@@ -324,10 +324,10 @@ async def get_accessibility_report(
 @router.get("/performance-metrics")
 async def get_performance_metrics(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get system performance metrics"""
-    metrics = AdminService.get_performance_metrics(db)
+    metrics = await AdminService.get_performance_metrics(db)
     
     return {
         "success": True,
@@ -339,10 +339,10 @@ async def get_performance_metrics(
 @router.get("/system-health")
 async def get_system_health(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get system health status"""
-    health = AdminService.get_system_health(db)
+    health = await AdminService.get_system_health(db)
     
     return {
         "success": True,
@@ -355,10 +355,10 @@ async def get_system_health(
 async def create_announcement(
     announcement_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new announcement"""
-    announcement = AdminService.create_announcement(db, announcement_data, str(current_user.id))
+    announcement = await AdminService.create_announcement(db, announcement_data, str(current_user.id))
     
     return {
         "success": True,
@@ -373,11 +373,11 @@ async def get_all_announcements(
     limit: int = Query(20, ge=1, le=100),
     is_active: Optional[bool] = Query(None),
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all announcements"""
     skip = (page - 1) * limit
-    announcements, total = AdminService.get_all_announcements(db, skip, limit, is_active)
+    announcements, total = await AdminService.get_all_announcements(db, skip, limit, is_active)
     
     total_pages = (total + limit - 1) // limit
     
@@ -400,10 +400,10 @@ async def update_announcement(
     announcement_id: str,
     announcement_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update an announcement"""
-    announcement = AdminService.update_announcement(db, announcement_id, announcement_data)
+    announcement = await AdminService.update_announcement(db, announcement_id, announcement_data)
     if not announcement:
         raise HTTPException(status_code=404, detail="Announcement not found")
     
@@ -418,10 +418,10 @@ async def update_announcement(
 async def delete_announcement(
     announcement_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete an announcement"""
-    success = AdminService.delete_announcement(db, announcement_id)
+    success = await AdminService.delete_announcement(db, announcement_id)
     if not success:
         raise HTTPException(status_code=404, detail="Announcement not found")
     
@@ -435,10 +435,10 @@ async def delete_announcement(
 @router.get("/departments")
 async def get_all_departments(
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all departments"""
-    departments = AdminService.get_all_departments(db)
+    departments = await AdminService.get_all_departments(db)
     
     return {
         "success": True,
@@ -452,10 +452,10 @@ async def get_all_departments(
 async def create_department(
     department_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new department"""
-    department = AdminService.create_department(db, department_data)
+    department = await AdminService.create_department(db, department_data)
     
     return {
         "success": True,
@@ -469,10 +469,10 @@ async def update_department(
     department_id: str,
     department_data: dict,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a department"""
-    department = AdminService.update_department(db, department_id, department_data)
+    department = await AdminService.update_department(db, department_id, department_data)
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
     
@@ -487,10 +487,10 @@ async def update_department(
 async def delete_department(
     department_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a department"""
-    success = AdminService.delete_department(db, department_id)
+    success = await AdminService.delete_department(db, department_id)
     if not success:
         raise HTTPException(status_code=404, detail="Department not found")
     
@@ -509,11 +509,11 @@ async def get_audit_logs(
     action: Optional[str] = Query(None),
     resource_type: Optional[str] = Query(None),
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get audit logs"""
     skip = (page - 1) * limit
-    logs, total = AdminService.get_audit_logs(db, skip, limit, user_id, action, resource_type)
+    logs, total = await AdminService.get_audit_logs(db, skip, limit, user_id, action, resource_type)
     
     total_pages = (total + limit - 1) // limit
     

@@ -2,7 +2,7 @@
 User management API routes
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_db
 from app.schemas.user import UserResponse, UserUpdate, UserListResponse
@@ -16,14 +16,14 @@ router = APIRouter(prefix="/api/users", tags=["User Management"])
 @router.get("/profile", response_model=dict)
 async def get_profile(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get current user profile"""
-    
-    user = UserService.get_user_profile(db, str(current_user.id))
+
+    user = await UserService.get_user_profile(db, str(current_user.id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {
         "success": True,
         "data": UserResponse.from_orm(user)
@@ -34,14 +34,14 @@ async def get_profile(
 async def update_profile(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update user profile"""
-    
-    updated_user = UserService.update_user_profile(db, str(current_user.id), user_update)
+
+    updated_user = await UserService.update_user_profile(db, str(current_user.id), user_update)
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {
         "success": True,
         "data": UserResponse.from_orm(updated_user)
@@ -55,15 +55,15 @@ async def get_users(
     role: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all users (Admin only)"""
-    
+
     skip = (page - 1) * limit
-    users, total = UserService.get_users(db, skip, limit, role, department)
-    
+    users, total = await UserService.get_users(db, skip, limit, role, department)
+
     total_pages = (total + limit - 1) // limit
-    
+
     return {
         "success": True,
         "data": {
@@ -82,14 +82,14 @@ async def get_users(
 async def deactivate_user(
     user_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Deactivate user account (Admin only)"""
-    
-    success = UserService.deactivate_user(db, user_id)
+
+    success = await UserService.deactivate_user(db, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {
         "success": True,
         "message": "User deactivated successfully"
@@ -100,14 +100,14 @@ async def deactivate_user(
 async def activate_user(
     user_id: str,
     current_user: User = Depends(require_roles(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Activate user account (Admin only)"""
-    
-    success = UserService.activate_user(db, user_id)
+
+    success = await UserService.activate_user(db, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {
         "success": True,
         "message": "User activated successfully"

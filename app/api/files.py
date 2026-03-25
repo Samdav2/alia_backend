@@ -3,7 +3,7 @@ File management API routes
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse as FastAPIFileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Literal
 from app.database import get_db
 from app.schemas.file import FileUploadResponse, FileResponse, FileListResponse
@@ -30,15 +30,15 @@ async def upload_file(
     alt_text: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Upload file with context (course/module/topic)"""
-    
+
     # Validate context
     valid_contexts = ['course', 'module', 'topic', 'general']
     if context not in valid_contexts:
         raise HTTPException(status_code=400, detail=f"Invalid context. Must be one of: {valid_contexts}")
-    
+
     # Validate UUID formats if provided
     try:
         if course_id:
@@ -49,22 +49,22 @@ async def upload_file(
             uuid.UUID(topic_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID format")
-    
+
     # Validate file type
     if not FileService.is_allowed_file_type(file.filename):
         raise HTTPException(status_code=400, detail="File type not allowed")
-    
+
     # Validate file size
     file_content = await file.read()
     if not FileService.is_file_size_valid(len(file_content)):
         raise HTTPException(status_code=400, detail="File size too large")
-    
+
     # Reset file pointer
     await file.seek(0)
-    
+
     try:
         # Save file with context
-        db_file = FileService.save_uploaded_file(
+        db_file = await FileService.save_uploaded_file(
             db=db,
             file=file,
             uploaded_by=str(current_user.id),
@@ -76,7 +76,7 @@ async def upload_file(
             alt_text=alt_text,
             description=description
         )
-        
+
         return {
             "success": True,
             "data": {
@@ -105,10 +105,10 @@ async def get_files(
     module_id: Optional[str] = Query(None),
     topic_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get files by context"""
-    
+
     if context:
         # Validate UUID formats if provided
         try:
@@ -120,8 +120,8 @@ async def get_files(
                 uuid.UUID(topic_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid UUID format")
-        
-        files = FileService.get_files_by_context(
+
+        files = await FileService.get_files_by_context(
             db=db,
             context=context,
             course_id=course_id,
@@ -131,12 +131,12 @@ async def get_files(
         )
     else:
         # Get all files for the user
-        files = FileService.get_files_by_context(
+        files = await FileService.get_files_by_context(
             db=db,
             context='general',
             uploaded_by=str(current_user.id)
         )
-    
+
     return {
         "success": True,
         "data": {
@@ -157,24 +157,24 @@ async def get_files(
 @router.get("/download/{file_id}")
 async def download_file(
     file_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Download/serve file"""
-    
+
     # Validate UUID format
     try:
         uuid.UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file ID format")
-    
-    file_record = FileService.get_file_by_id(db, file_id)
+
+    file_record = await FileService.get_file_by_id(db, file_id)
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
-    
+
     # Check if file exists on disk
     if not os.path.exists(file_record.file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
-    
+
     # Return file with proper headers
     return FastAPIFileResponse(
         path=file_record.file_path,
@@ -186,20 +186,20 @@ async def download_file(
 @router.get("/{file_id}", response_model=dict)
 async def get_file_info(
     file_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get file information"""
-    
+
     # Validate UUID format
     try:
         uuid.UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file ID format")
-    
-    file_record = FileService.get_file_by_id(db, file_id)
+
+    file_record = await FileService.get_file_by_id(db, file_id)
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
-    
+
     return {
         "success": True,
         "data": {
@@ -215,27 +215,27 @@ async def update_file_metadata(
     alt_text: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update file metadata"""
-    
+
     # Validate UUID format
     try:
         uuid.UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file ID format")
-    
-    updated_file = FileService.update_file_metadata(
+
+    updated_file = await FileService.update_file_metadata(
         db=db,
         file_id=file_id,
         user_id=str(current_user.id),
         alt_text=alt_text,
         description=description
     )
-    
+
     if not updated_file:
         raise HTTPException(status_code=404, detail="File not found or access denied")
-    
+
     return {
         "success": True,
         "data": FileResponse.from_orm(updated_file)
@@ -246,20 +246,20 @@ async def update_file_metadata(
 async def delete_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete file"""
-    
+
     # Validate UUID format
     try:
         uuid.UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file ID format")
-    
-    success = FileService.delete_file(db, file_id, str(current_user.id))
+
+    success = await FileService.delete_file(db, file_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="File not found or access denied")
-    
+
     return {
         "success": True,
         "message": "File deleted successfully"
@@ -271,23 +271,23 @@ async def get_file_stats(
     context: str,
     context_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get file statistics for a specific context"""
-    
+
     # Validate context
     valid_contexts = ['course', 'module', 'topic']
     if context not in valid_contexts:
         raise HTTPException(status_code=400, detail=f"Invalid context. Must be one of: {valid_contexts}")
-    
+
     # Validate UUID format
     try:
         uuid.UUID(context_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid context ID format")
-    
-    stats = FileService.get_file_stats_by_context(db, context, context_id)
-    
+
+    stats = await FileService.get_file_stats_by_context(db, context, context_id)
+
     return {
         "success": True,
         "data": stats

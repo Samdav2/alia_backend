@@ -1,10 +1,13 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
 import uuid
 from app.database import Base
 from sqlalchemy import Column, String, Text, ForeignKey, Boolean, DateTime, JSON, Integer, Float, func
+
+if TYPE_CHECKING:
+    from .course import Topic
+    from .user import User
 
 class Quiz(Base, table=True):
     __tablename__ = "quizzes"

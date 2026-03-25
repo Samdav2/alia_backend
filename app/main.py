@@ -58,40 +58,40 @@ async def lifespan(app: FastAPI):
         raise
 
     # Run Alembic migrations automatically on startup
-    try:
-        logger.info("Running database migrations...")
-        from alembic import command
-        from alembic.config import Config
-        import os
+    # try:
+    #     logger.info("Running database migrations...")
+    #     from alembic import command
+    #     from alembic.config import Config
+    #     import os
 
-        # Get the project directory
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    #     # Get the project directory
+    #     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        # Path to alembic.ini
-        alembic_ini_path = os.path.join(project_dir, "alembic.ini")
+    #     # Path to alembic.ini
+    #     alembic_ini_path = os.path.join(project_dir, "alembic.ini")
 
-        # Create Alembic config
-        alembic_cfg = Config(alembic_ini_path)
+    #     # Create Alembic config
+    #     alembic_cfg = Config(alembic_ini_path)
 
-        # Set sqlalchemy URL from environment
-        from app.config import get_settings
-        settings = get_settings()
+    #     # Set sqlalchemy URL from environment
+    #     from app.config import get_settings
+    #     settings = get_settings()
 
-        # Convert async URL to sync for Alembic
-        db_url = settings.database_url
-        if db_url.startswith("postgresql+asyncpg://"):
-            db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    #     # Convert async URL to sync for Alembic
+    #     db_url = settings.database_url
+    #     if db_url.startswith("postgresql+asyncpg://"):
+    #         db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
 
-        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+    #     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-        # Run migrations
-        command.upgrade(alembic_cfg, "head")
-        logger.info("✓ Database migrations completed successfully")
+    #     # Run migrations
+    #     command.upgrade(alembic_cfg, "head")
+    #     logger.info("✓ Database migrations completed successfully")
 
-    except Exception as e:
-        logger.error(f"⚠ Migration warning (may be normal): {e}")
-        # Don't fail startup if migrations can't run, as they may already be applied
-        pass
+    # except Exception as e:
+    #     logger.error(f"⚠ Migration warning (may be normal): {e}")
+    #     # Don't fail startup if migrations can't run, as they may already be applied
+    #     pass
 
     yield
 
@@ -118,7 +118,7 @@ app = FastAPI(
 # Security Middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] if settings.debug else ["alia.edu.ng", "api.alia.edu.ng"]
+    allowed_hosts=["*"] if settings.debug else ["https://alia.com.ng", "https://www.alia.com.ng", "http://localhost:3000", "http://localhost:5173", "http://localhost:8000"]
 )
 
 # CORS Middleware

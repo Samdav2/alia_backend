@@ -1,11 +1,14 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
 import enum
 import uuid
 from app.database import Base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, JSON, Enum, func
+
+if TYPE_CHECKING:
+    from .user import User
+    from .course import Course, Topic
 
 class ProgressStatus(str, enum.Enum):
     NOT_STARTED = "not_started"

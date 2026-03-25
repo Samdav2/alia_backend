@@ -2,7 +2,7 @@
 Lecturer-specific API routes
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from app.database import get_db
 from app.schemas.course import CourseCreate, CourseUpdate, ModuleCreate, TopicCreate
@@ -22,11 +22,11 @@ async def get_my_courses(
     limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get lecturer's own courses"""
     skip = (page - 1) * limit
-    courses, total = LecturerService.get_lecturer_courses(
+    courses, total = await LecturerService.get_lecturer_courses(
         db, str(current_user.id), skip, limit, status
     )
     
@@ -50,7 +50,7 @@ async def get_my_courses(
 async def publish_course(
     course_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Publish a course"""
     # Validate UUID format
@@ -59,7 +59,7 @@ async def publish_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = LecturerService.publish_course(db, course_id, str(current_user.id))
+    success = await LecturerService.publish_course(db, course_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="Course not found or access denied")
     
@@ -73,7 +73,7 @@ async def publish_course(
 async def unpublish_course(
     course_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Unpublish a course"""
     # Validate UUID format
@@ -82,7 +82,7 @@ async def unpublish_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    success = LecturerService.unpublish_course(db, course_id, str(current_user.id))
+    success = await LecturerService.unpublish_course(db, course_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="Course not found or access denied")
     
@@ -97,10 +97,10 @@ async def create_module(
     course_id: str,
     module_data: ModuleCreate,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new module in a course"""
-    module = LecturerService.create_module(db, course_id, module_data, str(current_user.id))
+    module = await LecturerService.create_module(db, course_id, module_data, str(current_user.id))
     if not module:
         raise HTTPException(status_code=404, detail="Course not found or access denied")
     
@@ -115,10 +115,10 @@ async def update_module(
     module_id: str,
     module_data: dict,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a module"""
-    module = LecturerService.update_module(db, module_id, module_data, str(current_user.id))
+    module = await LecturerService.update_module(db, module_id, module_data, str(current_user.id))
     if not module:
         raise HTTPException(status_code=404, detail="Module not found or access denied")
     
@@ -132,10 +132,10 @@ async def update_module(
 async def delete_module(
     module_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a module"""
-    success = LecturerService.delete_module(db, module_id, str(current_user.id))
+    success = await LecturerService.delete_module(db, module_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="Module not found or access denied")
     
@@ -150,10 +150,10 @@ async def reorder_modules(
     course_id: str,
     module_orders: dict,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Reorder modules in a course"""
-    success = LecturerService.reorder_modules(
+    success = await LecturerService.reorder_modules(
         db, course_id, module_orders.get("module_orders", []), str(current_user.id)
     )
     if not success:
@@ -170,10 +170,10 @@ async def create_topic(
     module_id: str,
     topic_data: TopicCreate,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new topic in a module"""
-    topic = LecturerService.create_topic(db, module_id, topic_data, str(current_user.id))
+    topic = await LecturerService.create_topic(db, module_id, topic_data, str(current_user.id))
     if not topic:
         raise HTTPException(status_code=404, detail="Module not found or access denied")
     
@@ -188,10 +188,10 @@ async def update_topic(
     topic_id: str,
     topic_data: dict,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a topic"""
-    topic = LecturerService.update_topic(db, topic_id, topic_data, str(current_user.id))
+    topic = await LecturerService.update_topic(db, topic_id, topic_data, str(current_user.id))
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found or access denied")
     
@@ -205,10 +205,10 @@ async def update_topic(
 async def delete_topic(
     topic_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a topic"""
-    success = LecturerService.delete_topic(db, topic_id, str(current_user.id))
+    success = await LecturerService.delete_topic(db, topic_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="Topic not found or access denied")
     
@@ -223,10 +223,10 @@ async def reorder_topics(
     module_id: str,
     topic_orders: dict,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Reorder topics in a module"""
-    success = LecturerService.reorder_topics(
+    success = await LecturerService.reorder_topics(
         db, module_id, topic_orders.get("topic_orders", []), str(current_user.id)
     )
     if not success:
@@ -245,11 +245,11 @@ async def get_course_enrollments(
     limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get enrollments for a course"""
     skip = (page - 1) * limit
-    enrollments, total = LecturerService.get_course_enrollments(
+    enrollments, total = await LecturerService.get_course_enrollments(
         db, course_id, str(current_user.id), skip, limit, status
     )
     
@@ -276,10 +276,10 @@ async def get_course_enrollments(
 async def get_course_analytics(
     course_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get analytics for a course"""
-    analytics = LecturerService.get_course_analytics(db, course_id, str(current_user.id))
+    analytics = await LecturerService.get_course_analytics(db, course_id, str(current_user.id))
     if not analytics:
         raise HTTPException(status_code=404, detail="Course not found or access denied")
     
@@ -294,10 +294,10 @@ async def get_student_progress(
     course_id: str,
     student_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get specific student's progress in a course"""
-    progress = LecturerService.get_student_progress(
+    progress = await LecturerService.get_student_progress(
         db, course_id, student_id, str(current_user.id)
     )
     if not progress:
@@ -312,10 +312,10 @@ async def get_student_progress(
 @router.get("/class-demographics")
 async def get_class_demographics(
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get demographics of all students in lecturer's courses"""
-    demographics = LecturerService.get_class_demographics(db, str(current_user.id))
+    demographics = await LecturerService.get_class_demographics(db, str(current_user.id))
     
     return {
         "success": True,
@@ -326,10 +326,10 @@ async def get_class_demographics(
 @router.get("/alerts")
 async def get_lecturer_alerts(
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get alerts about students needing attention"""
-    alerts = LecturerService.get_lecturer_alerts(db, str(current_user.id))
+    alerts = await LecturerService.get_lecturer_alerts(db, str(current_user.id))
     
     return {
         "success": True,
@@ -343,10 +343,10 @@ async def get_lecturer_alerts(
 async def send_notification_to_students(
     notification_data: dict,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Send notification to students"""
-    success = LecturerService.send_notification_to_students(
+    success = await LecturerService.send_notification_to_students(
         db,
         str(current_user.id),
         notification_data.get("course_id"),
@@ -371,10 +371,10 @@ async def send_notification_to_students(
 async def create_quiz(
     quiz_data: QuizCreate,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new quiz for a topic"""
-    quiz = LecturerService.create_quiz(db, quiz_data, str(current_user.id))
+    quiz = await LecturerService.create_quiz(db, quiz_data, str(current_user.id))
     if not quiz:
         raise HTTPException(status_code=404, detail="Topic not found or access denied")
     
@@ -389,10 +389,10 @@ async def update_quiz(
     quiz_id: str,
     quiz_data: QuizUpdate,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a quiz"""
-    quiz = LecturerService.update_quiz(db, quiz_id, quiz_data, str(current_user.id))
+    quiz = await LecturerService.update_quiz(db, quiz_id, quiz_data, str(current_user.id))
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found or access denied")
     
@@ -406,10 +406,10 @@ async def update_quiz(
 async def delete_quiz(
     quiz_id: str,
     current_user: User = Depends(require_roles(["lecturer", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a quiz"""
-    success = LecturerService.delete_quiz(db, quiz_id, str(current_user.id))
+    success = await LecturerService.delete_quiz(db, quiz_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="Quiz not found or access denied")
     

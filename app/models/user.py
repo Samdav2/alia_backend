@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
