@@ -77,7 +77,7 @@ packages = [
     "Pillow==10.1.0",
     "openai==1.3.7",
     "google-generativeai==0.3.2",
-
+    "asyncpg==0.29.0"
 
 
 ]

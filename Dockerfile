@@ -27,6 +27,10 @@ COPY . .
 # Create uploads directory and set permissions
 RUN mkdir -p uploads && chmod 777 uploads
 
+# Make run script executable
+COPY run.sh .
+RUN chmod +x run.sh
+
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser \
     && chown -R appuser:appuser /app
@@ -39,6 +43,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-# Using app.main:app because it's the more complete implementation in the app/ directory
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Run migrations and start the application
+CMD ["./run.sh"]

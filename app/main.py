@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 # Import models to ensure tables are created
 from app.models import *
-from app.database import Base, engine
+from app.database import Base, engine, init_redis, close_redis, dispose_engine
 from app.config import get_settings
 from app.core.exceptions import (
     ALIAException, alia_exception_handler,
@@ -41,15 +41,30 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("Starting ALIA Platform API...")
-    
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created/verified")
-    
+
+    # Initialize Redis for caching
+    await init_redis()
+    logger.info("Redis initialized for caching and rate limiting")
+
+    # Verify async database connection
+    try:
+        async with engine.connect() as conn:
+            await conn.connection.ping()
+            logger.info("✓ Async database connection verified")
+    except Exception as e:
+        logger.error(f"✗ Database connection failed: {e}")
+        raise
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down ALIA Platform API...")
+
+    # Close Redis connection
+    await close_redis()
+
+    # Dispose async engine
+    await dispose_engine()
 
 
 # Create FastAPI application
@@ -86,16 +101,16 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.middleware("http")
 async def performance_middleware(request: Request, call_next):
     start_time = time.time()
-    
+
     response = await call_next(request)
-    
+
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
-    
+
     # Log slow requests
     if process_time > 1.0:
         logger.warning(f"Slow request: {request.method} {request.url} took {process_time:.2f}s")
-    
+
     return response
 
 
@@ -103,13 +118,13 @@ async def performance_middleware(request: Request, call_next):
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
-    
+
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    
+
     return response
 
 
@@ -157,7 +172,7 @@ app.include_router(lecturer.router)
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
