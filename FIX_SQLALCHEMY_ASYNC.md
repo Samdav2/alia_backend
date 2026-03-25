@@ -2,8 +2,8 @@
 
 ## Problem
 ```
-sqlalchemy.exc.InvalidRequestError: AsyncConnection.connection accessor 
-is not implemented as the attribute may need to reconnect on an invalidated 
+sqlalchemy.exc.InvalidRequestError: AsyncConnection.connection accessor
+is not implemented as the attribute may need to reconnect on an invalidated
 connection. Use the get_raw_connection() method.
 ```
 
