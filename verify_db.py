@@ -26,8 +26,9 @@ async def verify_database():
     # Test database connection
     print(f"\n🔌 Testing Database Connection...")
     try:
+        from sqlalchemy import text
         async with engine.connect() as conn:
-            await conn.connection.ping()
+            await conn.execute(text("SELECT 1"))
             print("  ✅ Database connection successful (async)")
     except Exception as e:
         print(f"  ❌ Database connection failed: {e}")

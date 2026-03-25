@@ -49,7 +49,9 @@ async def lifespan(app: FastAPI):
     # Verify async database connection
     try:
         async with engine.connect() as conn:
-            await conn.connection.ping()
+            # Use text() for raw SQL execution
+            from sqlalchemy import text
+            await conn.execute(text("SELECT 1"))
             logger.info("✓ Async database connection verified")
     except Exception as e:
         logger.error(f"✗ Database connection failed: {e}")
