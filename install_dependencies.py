@@ -66,7 +66,12 @@ packages = [
     "cloudinary==1.41.0",
     "psycopg[binary]",
     "psycopg-pool==3.2.1",
-    "PyJWT==2.8.0"
+    "PyJWT==2.8.0",
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "black==23.11.0",
+    "isort==5.12.0",
+    "flake8==6.1.0"
 ]
 
 def install(package):
