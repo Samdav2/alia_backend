@@ -1,9 +1,9 @@
 """
-Course management service
+Course management service - Async compatible
 """
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, or_, select
 from app.models.course import Course, Module, Topic, Enrollment
 from app.models.user import User
 from app.schemas.course import CourseCreate, CourseUpdate
@@ -12,16 +12,17 @@ import uuid
 
 class CourseService:
     @staticmethod
-    def get_courses(
-        db: Session,
+    async def get_courses(
+        db: AsyncSession,
         skip: int = 0,
         limit: int = 20,
         department: Optional[str] = None,
         level: Optional[str] = None,
         search: Optional[str] = None
     ) -> tuple[List[Course], int]:
-        query = db.query(Course).filter(Course.is_active == True)
-        
+        """Async: Get courses with optional filtering"""
+        query = select(Course).filter(Course.is_active == True)
+
         if department:
             query = query.filter(Course.department == department)
         if level:
@@ -34,21 +35,29 @@ class CourseService:
                     Course.code.contains(search)
                 )
             )
-        
-        total = query.count()
-        courses = query.offset(skip).limit(limit).all()
-        
+
+        # Get total count
+        count_result = await db.execute(select(func.count(Course.id)).filter(Course.is_active == True))
+        total = count_result.scalar() or 0
+
+        # Get paginated results
+        result = await db.execute(query.offset(skip).limit(limit))
+        courses = result.scalars().all()
+
         return courses, total
 
     @staticmethod
-    def get_course_by_id(db: Session, course_id: str) -> Optional[Course]:
-        return db.query(Course).filter(
+    async def get_course_by_id(db: AsyncSession, course_id: str) -> Optional[Course]:
+        """Async: Get course by ID"""
+        result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.is_active == True
-        ).first()
+        ))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def create_course(db: Session, course_data: CourseCreate, instructor_id: str) -> Course:
+    async def create_course(db: AsyncSession, course_data: CourseCreate, instructor_id: str) -> Course:
+        """Async: Create a new course"""
         db_course = Course(
             code=course_data.code,
             title=course_data.title,
@@ -60,24 +69,26 @@ class CourseService:
             thumbnail=course_data.thumbnail,
             instructor_id=instructor_id
         )
-        
+
         db.add(db_course)
-        db.commit()
-        db.refresh(db_course)
+        await db.commit()
+        await db.refresh(db_course)
         return db_course
 
     @staticmethod
-    def update_course(
-        db: Session,
+    async def update_course(
+        db: AsyncSession,
         course_id: str,
         course_update: CourseUpdate,
         instructor_id: str
     ) -> Optional[Course]:
-        course = db.query(Course).filter(
+        """Async: Update course"""
+        result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == instructor_id
-        ).first()
-        
+        ))
+        course = result.scalar_one_or_none()
+
         if not course:
             return None
 
@@ -85,30 +96,34 @@ class CourseService:
         for field, value in update_data.items():
             setattr(course, field, value)
 
-        db.commit()
-        db.refresh(course)
+        await db.commit()
+        await db.refresh(course)
         return course
 
     @staticmethod
-    def delete_course(db: Session, course_id: str, user_role: str) -> bool:
+    async def delete_course(db: AsyncSession, course_id: str, user_role: str) -> bool:
+        """Async: Soft delete course"""
         if user_role != "admin":
             return False
-            
-        course = db.query(Course).filter(Course.id == course_id).first()
+
+        result = await db.execute(select(Course).filter(Course.id == course_id))
+        course = result.scalar_one_or_none()
         if course:
             course.is_active = False
-            db.commit()
+            await db.commit()
             return True
         return False
 
     @staticmethod
-    def enroll_user(db: Session, user_id: str, course_id: str) -> Optional[Enrollment]:
+    async def enroll_user(db: AsyncSession, user_id: str, course_id: str) -> Optional[Enrollment]:
+        """Async: Enroll user in course"""
         # Check if already enrolled
-        existing = db.query(Enrollment).filter(
+        existing_result = await db.execute(select(Enrollment).filter(
             Enrollment.user_id == user_id,
             Enrollment.course_id == course_id
-        ).first()
-        
+        ))
+        existing = existing_result.scalar_one_or_none()
+
         if existing:
             return None
 
@@ -116,57 +131,68 @@ class CourseService:
             user_id=user_id,
             course_id=course_id
         )
-        
+
         db.add(enrollment)
-        db.commit()
-        db.refresh(enrollment)
+        await db.commit()
+        await db.refresh(enrollment)
         return enrollment
 
     @staticmethod
-    def unenroll_user(db: Session, user_id: str, course_id: str) -> bool:
-        enrollment = db.query(Enrollment).filter(
+    async def unenroll_user(db: AsyncSession, user_id: str, course_id: str) -> bool:
+        """Async: Unenroll user from course"""
+        result = await db.execute(select(Enrollment).filter(
             Enrollment.user_id == user_id,
             Enrollment.course_id == course_id
-        ).first()
-        
+        ))
+        enrollment = result.scalar_one_or_none()
+
         if enrollment:
-            db.delete(enrollment)
-            db.commit()
+            await db.delete(enrollment)
+            await db.commit()
             return True
         return False
 
     @staticmethod
-    def get_user_enrollments(db: Session, user_id: str) -> List[Enrollment]:
-        return db.query(Enrollment).filter(Enrollment.user_id == user_id).all()
+    async def get_user_enrollments(db: AsyncSession, user_id: str) -> List[Enrollment]:
+        """Async: Get user enrollments"""
+        result = await db.execute(select(Enrollment).filter(Enrollment.user_id == user_id))
+        return result.scalars().all()
 
     @staticmethod
-    def get_course_modules(db: Session, course_id: str) -> List[Module]:
-        return db.query(Module).filter(
+    async def get_course_modules(db: AsyncSession, course_id: str) -> List[Module]:
+        """Async: Get course modules"""
+        result = await db.execute(select(Module).filter(
             Module.course_id == course_id
-        ).order_by(Module.order).all()
+        ).order_by(Module.order))
+        return result.scalars().all()
 
     @staticmethod
-    def get_module_topics(db: Session, module_id: str) -> List[Topic]:
-        return db.query(Topic).filter(
+    async def get_module_topics(db: AsyncSession, module_id: str) -> List[Topic]:
+        """Async: Get module topics"""
+        result = await db.execute(select(Topic).filter(
             Topic.module_id == module_id
-        ).order_by(Topic.order).all()
+        ).order_by(Topic.order))
+        return result.scalars().all()
 
     @staticmethod
-    def get_topic_by_id(db: Session, topic_id: str) -> Optional[Topic]:
-        return db.query(Topic).filter(Topic.id == topic_id).first()
+    async def get_topic_by_id(db: AsyncSession, topic_id: str) -> Optional[Topic]:
+        """Async: Get topic by ID"""
+        result = await db.execute(select(Topic).filter(Topic.id == topic_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def check_user_enrollment(db: Session, user_id: str, course_id: str) -> bool:
-        """Check if a user is enrolled in a specific course"""
-        enrollment = db.query(Enrollment).filter(
+    async def check_user_enrollment(db: AsyncSession, user_id: str, course_id: str) -> bool:
+        """Async: Check if user is enrolled in course"""
+        result = await db.execute(select(Enrollment).filter(
             Enrollment.user_id == user_id,
             Enrollment.course_id == course_id
-        ).first()
+        ))
+        enrollment = result.scalar_one_or_none()
         return enrollment is not None
 
     @staticmethod
-    def get_courses_with_enrollment_status(
-        db: Session,
+    async def get_courses_with_enrollment_status(
+        db: AsyncSession,
         user_id: Optional[str] = None,
         skip: int = 0,
         limit: int = 20,
@@ -174,8 +200,8 @@ class CourseService:
         level: Optional[str] = None,
         search: Optional[str] = None
     ) -> tuple[List[Dict[str, Any]], int]:
-        """Get courses with enrollment status for a specific user"""
-        query = db.query(Course).filter(Course.is_active == True)
+        """Async: Get courses with enrollment status for user"""
+        query = select(Course).filter(Course.is_active == True)
 
         if department:
             query = query.filter(Course.department == department)
@@ -190,17 +216,23 @@ class CourseService:
                 )
             )
 
-        total = query.count()
-        courses = query.offset(skip).limit(limit).all()
+        # Get total count
+        count_result = await db.execute(select(func.count(Course.id)).filter(Course.is_active == True))
+        total = count_result.scalar() or 0
+
+        # Get paginated results
+        result = await db.execute(query.offset(skip).limit(limit))
+        courses = result.scalars().all()
 
         # Add enrollment status to each course
         courses_with_status = []
         for course in courses:
             # Count enrollments for this course
-            enrollment_count = db.query(Enrollment).filter(
+            enrollment_count_result = await db.execute(select(func.count(Enrollment.id)).filter(
                 Enrollment.course_id == course.id
-            ).count()
-            
+            ))
+            enrollment_count = enrollment_count_result.scalar() or 0
+
             course_dict = {
                 'id': str(course.id),
                 'code': course.code,
@@ -221,7 +253,7 @@ class CourseService:
 
             # Check enrollment status if user is provided
             if user_id:
-                course_dict['is_enrolled'] = CourseService.check_user_enrollment(
+                course_dict['is_enrolled'] = await CourseService.check_user_enrollment(
                     db, user_id, str(course.id)
                 )
 

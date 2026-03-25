@@ -1,11 +1,12 @@
 """
-Authentication service
+Authentication service - Async compatible
 """
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.user import User
 from app.config import get_settings
 import uuid
@@ -31,7 +32,7 @@ class AuthService:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
-        
+
         to_encode.update({"exp": expire, "type": "access"})
         encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
         return encoded_jwt
@@ -53,8 +54,10 @@ class AuthService:
             return None
 
     @staticmethod
-    def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
-        user = db.query(User).filter(User.email == email).first()
+    async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
+        """Async: Authenticate user by email and password"""
+        result = await db.execute(select(User).filter(User.email == email))
+        user = result.scalar_one_or_none()
         if not user:
             return None
         if not AuthService.verify_password(password, user.hashed_password):
@@ -62,7 +65,8 @@ class AuthService:
         return user
 
     @staticmethod
-    def create_user(db: Session, user_data: dict) -> User:
+    async def create_user(db: AsyncSession, user_data: dict) -> User:
+        """Async: Create a new user"""
         # Create user with UUID
         db_user = User(
             full_name=user_data["full_name"],
@@ -72,16 +76,20 @@ class AuthService:
             department=user_data["department"],
             student_id=user_data.get("student_id")
         )
-        
+
         db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        await db.commit()
+        await db.refresh(db_user)
         return db_user
 
     @staticmethod
-    def get_user_by_email(db: Session, email: str) -> Optional[User]:
-        return db.query(User).filter(User.email == email).first()
+    async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+        """Async: Get user by email"""
+        result = await db.execute(select(User).filter(User.email == email))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
-        return db.query(User).filter(User.id == user_id).first()
+    async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
+        """Async: Get user by ID"""
+        result = await db.execute(select(User).filter(User.id == user_id))
+        return result.scalar_one_or_none()

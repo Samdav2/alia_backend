@@ -1,5 +1,5 @@
 """
-Lecturer service for course and student management - Async compatible
+Lecturer service for course and student management
 """
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,8 +22,8 @@ class LecturerService:
         limit: int = 20,
         status: Optional[str] = None
     ) -> Tuple[List[Course], int]:
-        """Async: Get all courses by a lecturer"""
-        query = select(Course).filter(Course.instructor_id == lecturer_id)
+        """Get all courses by a lecturer"""
+        query = result = await db.execute(select(Course).filter(Course.instructor_id == lecturer_id)
         
         if status:
             if status == "active":
@@ -31,22 +31,18 @@ class LecturerService:
             elif status == "draft":
                 query = query.filter(Course.is_active == False)
         
-        count_result = await db.execute(select(func.count(Course.id)).filter(Course.instructor_id == lecturer_id))
-        total = count_result.scalar() or 0
-        
-        result = await db.execute(query.offset(skip).limit(limit))
-        courses = result.scalars().all()
+        total = queryscalar() or 0
+        courses = query.offset(skip).limit(limit).scalars().all()
         
         return courses, total
 
     @staticmethod
     async def publish_course(db: AsyncSession, course_id: str, lecturer_id: str) -> bool:
-        """Async: Publish a course"""
-        result = await db.execute(select(Course).filter(
+        """Publish a course"""
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return False
@@ -57,12 +53,11 @@ class LecturerService:
 
     @staticmethod
     async def unpublish_course(db: AsyncSession, course_id: str, lecturer_id: str) -> bool:
-        """Async: Unpublish a course"""
-        result = await db.execute(select(Course).filter(
+        """Unpublish a course"""
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return False
@@ -78,13 +73,12 @@ class LecturerService:
         module_data: ModuleCreate,
         lecturer_id: str
     ) -> Optional[Module]:
-        """Async: Create a new module"""
+        """Create a new module"""
         # Verify course ownership
-        result = await db.execute(select(Course).filter(
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return None
@@ -108,12 +102,11 @@ class LecturerService:
         module_data: dict,
         lecturer_id: str
     ) -> Optional[Module]:
-        """Async: Update a module"""
-        result = await db.execute(select(Module).join(Course).filter(
+        """Update a module"""
+        module = result = await db.execute(select(Module).join(Course).filter(
             Module.id == module_id,
             Course.instructor_id == lecturer_id
-        ))
-        module = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not module:
             return None
@@ -128,12 +121,11 @@ class LecturerService:
 
     @staticmethod
     async def delete_module(db: AsyncSession, module_id: str, lecturer_id: str) -> bool:
-        """Async: Delete a module"""
-        result = await db.execute(select(Module).join(Course).filter(
+        """Delete a module"""
+        module = result = await db.execute(select(Module).join(Course).filter(
             Module.id == module_id,
             Course.instructor_id == lecturer_id
-        ))
-        module = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not module:
             return False
@@ -149,22 +141,20 @@ class LecturerService:
         module_orders: List[dict],
         lecturer_id: str
     ) -> bool:
-        """Async: Reorder modules"""
-        result = await db.execute(select(Course).filter(
+        """Reorder modules"""
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return False
         
         for order_data in module_orders:
-            result = await db.execute(select(Module).filter(
+            module = result = await db.execute(select(Module).filter(
                 Module.id == order_data["module_id"],
                 Module.course_id == course_id
-            ))
-            module = result.scalar_one_or_none()
+            ).scalar_one_or_none()
             
             if module:
                 module.order = order_data["order"]
@@ -179,13 +169,12 @@ class LecturerService:
         topic_data: TopicCreate,
         lecturer_id: str
     ) -> Optional[Topic]:
-        """Async: Create a new topic"""
+        """Create a new topic"""
         # Verify module ownership through course
-        result = await db.execute(select(Module).join(Course).filter(
+        module = result = await db.execute(select(Module).join(Course).filter(
             Module.id == module_id,
             Course.instructor_id == lecturer_id
-        ))
-        module = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not module:
             return None
@@ -215,12 +204,11 @@ class LecturerService:
         topic_data: dict,
         lecturer_id: str
     ) -> Optional[Topic]:
-        """Async: Update a topic"""
-        result = await db.execute(select(Topic).join(Module).join(Course).filter(
+        """Update a topic"""
+        topic = result = await db.execute(select(Topic).join(Module).join(Course).filter(
             Topic.id == topic_id,
             Course.instructor_id == lecturer_id
-        ))
-        topic = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not topic:
             return None
@@ -235,12 +223,11 @@ class LecturerService:
 
     @staticmethod
     async def delete_topic(db: AsyncSession, topic_id: str, lecturer_id: str) -> bool:
-        """Async: Delete a topic"""
-        result = await db.execute(select(Topic).join(Module).join(Course).filter(
+        """Delete a topic"""
+        topic = result = await db.execute(select(Topic).join(Module).join(Course).filter(
             Topic.id == topic_id,
             Course.instructor_id == lecturer_id
-        ))
-        topic = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not topic:
             return False
@@ -256,22 +243,20 @@ class LecturerService:
         topic_orders: List[dict],
         lecturer_id: str
     ) -> bool:
-        """Async: Reorder topics"""
-        result = await db.execute(select(Module).join(Course).filter(
+        """Reorder topics"""
+        module = result = await db.execute(select(Module).join(Course).filter(
             Module.id == module_id,
             Course.instructor_id == lecturer_id
-        ))
-        module = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not module:
             return False
         
         for order_data in topic_orders:
-            result = await db.execute(select(Topic).filter(
+            topic = result = await db.execute(select(Topic).filter(
                 Topic.id == order_data["topic_id"],
                 Topic.module_id == module_id
-            ))
-            topic = result.scalar_one_or_none()
+            ).scalar_one_or_none()
             
             if topic:
                 topic.order = order_data["order"]
@@ -288,41 +273,34 @@ class LecturerService:
         limit: int = 20,
         status: Optional[str] = None
     ) -> Optional[Tuple[List[dict], int]]:
-        """Async: Get enrollments for a course"""
+        """Get enrollments for a course"""
         # Verify course ownership
-        result = await db.execute(select(Course).filter(
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return None
         
-        query = select(Enrollment).filter(Enrollment.course_id == course_id)
+        query = result = await db.execute(select(Enrollment).filter(Enrollment.course_id == course_id)
         
         if status:
             query = query.filter(Enrollment.status == status)
         
-        count_result = await db.execute(select(func.count(Enrollment.id)).filter(Enrollment.course_id == course_id))
-        total = count_result.scalar() or 0
-        
-        result = await db.execute(query.offset(skip).limit(limit))
-        enrollments = result.scalars().all()
+        total = queryscalar() or 0
+        enrollments = query.offset(skip).limit(limit).scalars().all()
         
         # Enrich with user and progress data
-        result_list = []
+        result = []
         for enrollment in enrollments:
-            user_result = await db.execute(select(User).filter(User.id == enrollment.user_id))
-            user = user_result.scalar_one_or_none()
-            
-            progress_result = await db.execute(select(Progress).filter(
+            user = result = await db.execute(select(User).filter(User.id == enrollment.user_id).scalar_one_or_none()
+            progress = result = await db.execute(select(Progress).filter(
                 Progress.user_id == enrollment.user_id,
                 Progress.course_id == course_id
-            ))
-            progress = progress_result.scalar_one_or_none()
+            ).scalar_one_or_none()
             
-            result_list.append({
+            result.append({
                 "id": str(enrollment.id),
                 "user": {
                     "id": str(user.id),
@@ -334,7 +312,7 @@ class LecturerService:
                 "status": enrollment.status
             })
         
-        return result_list, total
+        return result, total
 
     @staticmethod
     async def get_course_analytics(
@@ -342,60 +320,52 @@ class LecturerService:
         course_id: str,
         lecturer_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Async: Get analytics for a course"""
-        result = await db.execute(select(Course).filter(
+        """Get analytics for a course"""
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return None
         
         # Get enrollment stats
-        total_result = await db.execute(select(func.count(Enrollment.id)).filter(
+        total_enrollments = await db.execute(select(func.count(Enrollment.id)).filter(
             Enrollment.course_id == course_id
-        ))
-        total_enrollments = total_result.scalar() or 0
+        ).scalar()
         
-        active_result = await db.execute(select(func.count(Enrollment.id)).filter(
+        active_students = await db.execute(select(func.count(Enrollment.id)).filter(
             Enrollment.course_id == course_id,
             Enrollment.status == "active"
-        ))
-        active_students = active_result.scalar() or 0
+        ).scalar()
         
-        completed_result = await db.execute(select(func.count(Enrollment.id)).filter(
+        completed_students = await db.execute(select(func.count(Enrollment.id)).filter(
             Enrollment.course_id == course_id,
             Enrollment.status == "completed"
-        ))
-        completed_students = completed_result.scalar() or 0
+        ).scalar()
         
         completion_rate = (completed_students / total_enrollments * 100) if total_enrollments > 0 else 0
         
         # Get average progress
-        avg_result = await db.execute(select(func.avg(Progress.completion_percentage)).filter(
+        avg_progress = await db.execute(select(func.avg(Progress.completion_percentage)).filter(
             Progress.course_id == course_id
-        ))
-        avg_progress = avg_result.scalar() or 0
+        ).scalar() or 0
         
         # Get struggling students (progress < 30%)
-        struggle_result = await db.execute(select(Progress).filter(
+        struggling = result = await db.execute(select(Progress).join(User).filter(
             Progress.course_id == course_id,
             Progress.completion_percentage < 30
-        ).limit(10))
-        struggling = struggle_result.scalars().all()
+        ).limit(10).scalars().all()
         
-        struggling_students = []
-        for p in struggling:
-            user_result = await db.execute(select(User).filter(User.id == p.user_id))
-            user = user_result.scalar_one_or_none()
-            if user:
-                struggling_students.append({
-                    "user_id": str(p.user_id),
-                    "full_name": user.full_name,
-                    "progress": p.completion_percentage,
-                    "average_score": 0  # Placeholder
-                })
+        struggling_students = [
+            {
+                "user_id": str(p.user_id),
+                "full_name": result = await db.execute(select(User).filter(User.id == p.user_id).scalar_one_or_none().full_name,
+                "progress": p.completion_percentage,
+                "average_score": 0  # Placeholder
+            }
+            for p in struggling
+        ]
         
         return {
             "total_enrollments": total_enrollments,
@@ -413,38 +383,31 @@ class LecturerService:
         student_id: str,
         lecturer_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Async: Get specific student's progress"""
-        result = await db.execute(select(Course).filter(
+        """Get specific student's progress"""
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return None
         
-        student_result = await db.execute(select(User).filter(User.id == student_id))
-        student = student_result.scalar_one_or_none()
-        
-        enrollment_result = await db.execute(select(Enrollment).filter(
+        student = result = await db.execute(select(User).filter(User.id == student_id).scalar_one_or_none()
+        enrollment = result = await db.execute(select(Enrollment).filter(
             Enrollment.user_id == student_id,
             Enrollment.course_id == course_id
-        ))
-        enrollment = enrollment_result.scalar_one_or_none()
-        
-        progress_result = await db.execute(select(Progress).filter(
+        ).scalar_one_or_none()
+        progress = result = await db.execute(select(Progress).filter(
             Progress.user_id == student_id,
             Progress.course_id == course_id
-        ))
-        progress = progress_result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not student or not enrollment:
             return None
         
-        topic_progress_result = await db.execute(select(TopicProgress).filter(
+        topic_progress = result = await db.execute(select(TopicProgress).filter(
             TopicProgress.progress_id == progress.id
-        )) if progress else None
-        topic_progress = topic_progress_result.scalars().all() if topic_progress_result else []
+        ).scalars().all() if progress else []
         
         return {
             "student": {
@@ -469,13 +432,12 @@ class LecturerService:
 
     @staticmethod
     async def get_class_demographics(db: AsyncSession, lecturer_id: str) -> Dict[str, Any]:
-        """Async: Get demographics of all students in lecturer's courses"""
+        """Get demographics of all students in lecturer's courses"""
         # Get all students enrolled in lecturer's courses
-        result = await db.execute(select(User).join(Enrollment).join(Course).filter(
+        students = result = await db.execute(select(User).join(Enrollment).join(Course).filter(
             Course.instructor_id == lecturer_id,
             User.role == "student"
-        ).distinct())
-        students = result.scalars().all()
+        ).distinct().scalars().all()
         
         total_students = len(students)
         
@@ -506,41 +468,37 @@ class LecturerService:
 
     @staticmethod
     async def get_lecturer_alerts(db: AsyncSession, lecturer_id: str) -> List[Dict[str, Any]]:
-        """Async: Get alerts about students needing attention"""
+        """Get alerts about students needing attention"""
         alerts = []
         
         # Get courses
-        result = await db.execute(select(Course).filter(Course.instructor_id == lecturer_id))
-        courses = result.scalars().all()
+        courses = result = await db.execute(select(Course).filter(Course.instructor_id == lecturer_id).scalars().all()
         
         for course in courses:
             # Find students who haven't accessed course in 7 days
             seven_days_ago = datetime.utcnow() - timedelta(days=7)
-            inactive_result = await db.execute(select(Progress).join(User).filter(
+            inactive_progress = result = await db.execute(select(Progress).join(User).filter(
                 Progress.course_id == course.id,
                 Progress.last_accessed_at < seven_days_ago
-            ))
-            inactive_progress = inactive_result.scalars().all()
+            ).scalars().all()
             
             for progress in inactive_progress:
-                user_result = await db.execute(select(User).filter(User.id == progress.user_id))
-                user = user_result.scalar_one_or_none()
-                if user:
-                    alerts.append({
-                        "id": str(uuid.uuid4()),
-                        "type": "struggling_student",
-                        "severity": "high",
-                        "student": {
-                            "id": str(user.id),
-                            "full_name": user.full_name
-                        },
-                        "course": {
-                            "id": str(course.id),
-                            "title": course.title
-                        },
-                        "message": f"Student has not accessed course in 7 days",
-                        "created_at": datetime.utcnow()
-                    })
+                user = result = await db.execute(select(User).filter(User.id == progress.user_id).scalar_one_or_none()
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "struggling_student",
+                    "severity": "high",
+                    "student": {
+                        "id": str(user.id),
+                        "full_name": user.full_name
+                    },
+                    "course": {
+                        "id": str(course.id),
+                        "title": course.title
+                    },
+                    "message": f"Student has not accessed course in 7 days",
+                    "created_at": datetime.utcnow()
+                })
         
         return alerts[:20]  # Limit to 20 alerts
 
@@ -555,13 +513,12 @@ class LecturerService:
         message: str,
         notification_type: str
     ) -> bool:
-        """Async: Send notification to students"""
+        """Send notification to students"""
         # Verify course ownership
-        result = await db.execute(select(Course).filter(
+        course = result = await db.execute(select(Course).filter(
             Course.id == course_id,
             Course.instructor_id == lecturer_id
-        ))
-        course = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not course:
             return False
@@ -569,21 +526,19 @@ class LecturerService:
         # Determine recipients
         recipients = []
         if recipient_type == "all":
-            enroll_result = await db.execute(select(Enrollment).filter(
+            enrollments = result = await db.execute(select(Enrollment).filter(
                 Enrollment.course_id == course_id,
                 Enrollment.status == "active"
-            ))
-            enrollments = enroll_result.scalars().all()
+            ).scalars().all()
             recipients = [e.user_id for e in enrollments]
         elif recipient_type == "specific":
             recipients = student_ids
         elif recipient_type == "struggling":
             # Get students with progress < 30%
-            prog_result = await db.execute(select(Progress).filter(
+            progress_records = result = await db.execute(select(Progress).filter(
                 Progress.course_id == course_id,
                 Progress.completion_percentage < 30
-            ))
-            progress_records = prog_result.scalars().all()
+            ).scalars().all()
             recipients = [p.user_id for p in progress_records]
         
         # Create notifications
@@ -607,16 +562,15 @@ class LecturerService:
         quiz_data,
         lecturer_id: str
     ):
-        """Async: Create a new quiz"""
+        """Create a new quiz"""
         from app.models.assessment import Quiz
         from app.models.course import Topic, Module, Course
         
         # Verify topic ownership through course
-        result = await db.execute(select(Topic).join(Module).join(Course).filter(
+        topic = result = await db.execute(select(Topic).join(Module).join(Course).filter(
             Topic.id == quiz_data.topic_id,
             Course.instructor_id == lecturer_id
-        ))
-        topic = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not topic:
             return None
@@ -643,15 +597,14 @@ class LecturerService:
         quiz_data,
         lecturer_id: str
     ):
-        """Async: Update a quiz"""
+        """Update a quiz"""
         from app.models.assessment import Quiz
         from app.models.course import Topic, Module, Course
         
-        result = await db.execute(select(Quiz).join(Topic).join(Module).join(Course).filter(
+        quiz = result = await db.execute(select(Quiz).join(Topic).join(Module).join(Course).filter(
             Quiz.id == quiz_id,
             Course.instructor_id == lecturer_id
-        ))
-        quiz = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not quiz:
             return None
@@ -670,15 +623,14 @@ class LecturerService:
 
     @staticmethod
     async def delete_quiz(db: AsyncSession, quiz_id: str, lecturer_id: str) -> bool:
-        """Async: Delete a quiz"""
+        """Delete a quiz"""
         from app.models.assessment import Quiz
         from app.models.course import Topic, Module, Course
         
-        result = await db.execute(select(Quiz).join(Topic).join(Module).join(Course).filter(
+        quiz = result = await db.execute(select(Quiz).join(Topic).join(Module).join(Course).filter(
             Quiz.id == quiz_id,
             Course.instructor_id == lecturer_id
-        ))
-        quiz = result.scalar_one_or_none()
+        ).scalar_one_or_none()
         
         if not quiz:
             return False

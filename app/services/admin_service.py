@@ -1,9 +1,9 @@
 """
-Admin service for system management
+Admin service for system management - Async compatible
 """
 from typing import List, Optional, Dict, Any, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, and_, or_, select, text
 from app.models.user import User
 from app.models.course import Course, Enrollment
 from app.models.department import Department
@@ -17,16 +17,16 @@ import uuid
 
 class AdminService:
     @staticmethod
-    def get_all_users(
-        db: Session,
+    async def get_all_users(
+        db: AsyncSession,
         skip: int = 0,
         limit: int = 20,
         role: Optional[str] = None,
         search: Optional[str] = None,
         is_active: Optional[bool] = None
     ) -> Tuple[List[User], int]:
-        """Get all users with filters"""
-        query = db.query(User)
+        """Async: Get all users with filters"""
+        query = select(User)
         
         if role:
             query = query.filter(User.role == role)
@@ -43,14 +43,17 @@ class AdminService:
         if is_active is not None:
             query = query.filter(User.is_active == is_active)
         
-        total = query.count()
-        users = query.offset(skip).limit(limit).all()
+        count_result = await db.execute(select(func.count(User.id)))
+        total = count_result.scalar() or 0
+        
+        result = await db.execute(query.offset(skip).limit(limit))
+        users = result.scalars().all()
         
         return users, total
 
     @staticmethod
-    def create_user(db: Session, user_data: dict) -> User:
-        """Create a new user"""
+    async def create_user(db: AsyncSession, user_data: dict) -> User:
+        """Async: Create a new user"""
         user = User(
             full_name=user_data["full_name"],
             email=user_data["email"],
@@ -62,14 +65,15 @@ class AdminService:
         )
         
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
         return user
 
     @staticmethod
-    def update_user(db: Session, user_id: str, user_data: dict) -> Optional[User]:
-        """Update a user"""
-        user = db.query(User).filter(User.id == user_id).first()
+    async def update_user(db: AsyncSession, user_id: str, user_data: dict) -> Optional[User]:
+        """Async: Update a user"""
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         
         if not user:
             return None
@@ -80,31 +84,33 @@ class AdminService:
             elif hasattr(user, key):
                 setattr(user, key, value)
         
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
         return user
 
     @staticmethod
-    def delete_user(db: Session, user_id: str) -> bool:
-        """Delete a user"""
-        user = db.query(User).filter(User.id == user_id).first()
+    async def delete_user(db: AsyncSession, user_id: str) -> bool:
+        """Async: Delete a user"""
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         
         if not user:
             return False
         
-        db.delete(user)
-        db.commit()
+        await db.delete(user)
+        await db.commit()
         return True
 
     @staticmethod
-    def bulk_user_action(
-        db: Session,
+    async def bulk_user_action(
+        db: AsyncSession,
         user_ids: List[str],
         action: str,
         data: Optional[dict] = None
     ) -> bool:
-        """Perform bulk action on users"""
-        users = db.query(User).filter(User.id.in_(user_ids)).all()
+        """Async: Perform bulk action on users"""
+        result = await db.execute(select(User).filter(User.id.in_(user_ids)))
+        users = result.scalars().all()
         
         if not users:
             return False
@@ -117,24 +123,24 @@ class AdminService:
                 user.is_active = False
         elif action == "delete":
             for user in users:
-                db.delete(user)
+                await db.delete(user)
         elif action == "update_role" and data:
             for user in users:
                 user.role = data.get("role")
         
-        db.commit()
+        await db.commit()
         return True
 
     @staticmethod
-    def get_all_courses_admin(
-        db: Session,
+    async def get_all_courses_admin(
+        db: AsyncSession,
         skip: int = 0,
         limit: int = 20,
         status: Optional[str] = None,
         department: Optional[str] = None
     ) -> Tuple[List[dict], int]:
-        """Get all courses with admin view"""
-        query = db.query(Course)
+        """Async: Get all courses with admin view"""
+        query = select(Course)
         
         if status == "active":
             query = query.filter(Course.is_active == True)
@@ -144,17 +150,23 @@ class AdminService:
         if department:
             query = query.filter(Course.department == department)
         
-        total = query.count()
-        courses = query.offset(skip).limit(limit).all()
+        count_result = await db.execute(select(func.count(Course.id)))
+        total = count_result.scalar() or 0
         
-        result = []
+        result = await db.execute(query.offset(skip).limit(limit))
+        courses = result.scalars().all()
+        
+        result_list = []
         for course in courses:
-            instructor = db.query(User).filter(User.id == course.instructor_id).first()
-            enrollment_count = db.query(func.count(Enrollment.id)).filter(
-                Enrollment.course_id == course.id
-            ).scalar()
+            instructor_result = await db.execute(select(User).filter(User.id == course.instructor_id))
+            instructor = instructor_result.scalar_one_or_none()
             
-            result.append({
+            enrollment_count_result = await db.execute(select(func.count(Enrollment.id)).filter(
+                Enrollment.course_id == course.id
+            ))
+            enrollment_count = enrollment_count_result.scalar() or 0
+            
+            result_list.append({
                 "id": str(course.id),
                 "code": course.code,
                 "title": course.title,
@@ -168,36 +180,39 @@ class AdminService:
                 "created_at": course.created_at
             })
         
-        return result, total
+        return result_list, total
 
     @staticmethod
-    def approve_course(db: Session, course_id: str) -> bool:
-        """Approve a course"""
-        course = db.query(Course).filter(Course.id == course_id).first()
+    async def approve_course(db: AsyncSession, course_id: str) -> bool:
+        """Async: Approve a course"""
+        result = await db.execute(select(Course).filter(Course.id == course_id))
+        course = result.scalar_one_or_none()
         
         if not course:
             return False
         
         course.is_active = True
-        db.commit()
+        await db.commit()
         return True
 
     @staticmethod
-    def reject_course(db: Session, course_id: str) -> bool:
-        """Reject a course"""
-        course = db.query(Course).filter(Course.id == course_id).first()
+    async def reject_course(db: AsyncSession, course_id: str) -> bool:
+        """Async: Reject a course"""
+        result = await db.execute(select(Course).filter(Course.id == course_id))
+        course = result.scalar_one_or_none()
         
         if not course:
             return False
         
         course.is_active = False
-        db.commit()
+        await db.commit()
         return True
 
     @staticmethod
-    def change_course_status(db: Session, course_id: str, status: str) -> bool:
-        """Change course status (draft/published)"""
-        course = db.query(Course).filter(Course.id == course_id).first()
+    async def change_course_status(db: AsyncSession, course_id: str, status: str) -> bool:
+        """Async: Change course status (draft/published)"""
+        result = await db.execute(select(Course).filter(Course.id == course_id))
+        course = result.scalar_one_or_none()
         
         if not course:
             return False
@@ -210,13 +225,14 @@ class AdminService:
         else:
             return False  # Invalid status
         
-        db.commit()
+        await db.commit()
         return True
 
     @staticmethod
-    def feature_course(db: Session, course_id: str, featured: bool) -> bool:
-        """Feature or unfeature a course"""
-        course = db.query(Course).filter(Course.id == course_id).first()
+    async def feature_course(db: AsyncSession, course_id: str, featured: bool) -> bool:
+        """Async: Feature or unfeature a course"""
+        result = await db.execute(select(Course).filter(Course.id == course_id))
+        course = result.scalar_one_or_none()
         
         if not course:
             return False
@@ -229,24 +245,36 @@ class AdminService:
             tags.remove("featured")
         
         course.tags = tags
-        db.commit()
+        await db.commit()
         return True
 
     @staticmethod
-    def get_system_statistics(db: Session) -> Dict[str, Any]:
-        """Get system-wide statistics"""
-        total_users = db.query(func.count(User.id)).scalar()
-        total_students = db.query(func.count(User.id)).filter(User.role == "student").scalar()
-        total_lecturers = db.query(func.count(User.id)).filter(User.role == "lecturer").scalar()
-        total_courses = db.query(func.count(Course.id)).scalar()
-        active_courses = db.query(func.count(Course.id)).filter(Course.is_active == True).scalar()
-        total_enrollments = db.query(func.count(Enrollment.id)).scalar()
+    async def get_system_statistics(db: AsyncSession) -> Dict[str, Any]:
+        """Async: Get system-wide statistics"""
+        total_users_result = await db.execute(select(func.count(User.id)))
+        total_users = total_users_result.scalar() or 0
+        
+        total_students_result = await db.execute(select(func.count(User.id)).filter(User.role == "student"))
+        total_students = total_students_result.scalar() or 0
+        
+        total_lecturers_result = await db.execute(select(func.count(User.id)).filter(User.role == "lecturer"))
+        total_lecturers = total_lecturers_result.scalar() or 0
+        
+        total_courses_result = await db.execute(select(func.count(Course.id)))
+        total_courses = total_courses_result.scalar() or 0
+        
+        active_courses_result = await db.execute(select(func.count(Course.id)).filter(Course.is_active == True))
+        active_courses = active_courses_result.scalar() or 0
+        
+        total_enrollments_result = await db.execute(select(func.count(Enrollment.id)))
+        total_enrollments = total_enrollments_result.scalar() or 0
         
         # Active users (logged in last 30 days)
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        active_users = db.query(func.count(User.id)).filter(
+        active_users_result = await db.execute(select(func.count(User.id)).filter(
             User.last_login >= thirty_days_ago
-        ).scalar()
+        ))
+        active_users = active_users_result.scalar() or 0
         
         return {
             "total_users": total_users,
@@ -259,38 +287,37 @@ class AdminService:
         }
 
     @staticmethod
-    def get_accessibility_report(db: Session) -> Dict[str, Any]:
-        """Get system-wide accessibility report"""
+    async def get_accessibility_report(db: AsyncSession) -> Dict[str, Any]:
+        """Async: Get system-wide accessibility report"""
         # Users with disabilities
-        users_with_disabilities = db.query(User).all()
+        result = await db.execute(select(User))
+        all_users = result.scalars().all()
+        
         disability_count = sum(
-            1 for u in users_with_disabilities 
+            1 for u in all_users 
             if u.disability_info and u.disability_info.get("hasDisability")
         )
         
-        # Accessibility feature usage
-        feature_usage = db.query(
-            AccessibilityUsage.feature_name,
-            func.count(AccessibilityUsage.id).label("usage_count")
-        ).group_by(AccessibilityUsage.feature_name).all()
+        total_users_result = await db.execute(select(func.count(User.id)))
+        total_users = total_users_result.scalar() or 0
         
         return {
             "users_with_disabilities": disability_count,
-            "total_users": db.query(func.count(User.id)).scalar(),
-            "feature_usage": [
-                {"feature": f.feature_name, "count": f.usage_count}
-                for f in feature_usage
-            ]
+            "total_users": total_users,
+            "feature_usage": []  # Placeholder
         }
 
     @staticmethod
-    def get_performance_metrics(db: Session) -> Dict[str, Any]:
-        """Get system performance metrics"""
+    async def get_performance_metrics(db: AsyncSession) -> Dict[str, Any]:
+        """Async: Get system performance metrics"""
         # Average course completion rate
-        total_enrollments = db.query(func.count(Enrollment.id)).scalar()
-        completed_enrollments = db.query(func.count(Enrollment.id)).filter(
+        total_enrollments_result = await db.execute(select(func.count(Enrollment.id)))
+        total_enrollments = total_enrollments_result.scalar() or 0
+        
+        completed_enrollments_result = await db.execute(select(func.count(Enrollment.id)).filter(
             Enrollment.status == "completed"
-        ).scalar()
+        ))
+        completed_enrollments = completed_enrollments_result.scalar() or 0
         
         completion_rate = (completed_enrollments / total_enrollments * 100) if total_enrollments > 0 else 0
         
@@ -306,11 +333,11 @@ class AdminService:
         }
 
     @staticmethod
-    def get_system_health(db: Session) -> Dict[str, Any]:
-        """Get system health status"""
+    async def get_system_health(db: AsyncSession) -> Dict[str, Any]:
+        """Async: Get system health status"""
         try:
             # Test database connection
-            db.execute("SELECT 1")
+            await db.execute(text("SELECT 1"))
             db_status = "healthy"
         except:
             db_status = "unhealthy"
@@ -322,8 +349,8 @@ class AdminService:
         }
 
     @staticmethod
-    def create_announcement(db: Session, announcement_data: dict, author_id: str) -> Announcement:
-        """Create a new announcement"""
+    async def create_announcement(db: AsyncSession, announcement_data: dict, author_id: str) -> Announcement:
+        """Async: Create a new announcement"""
         announcement = Announcement(
             title=announcement_data["title"],
             content=announcement_data["content"],
@@ -334,36 +361,40 @@ class AdminService:
         )
         
         db.add(announcement)
-        db.commit()
-        db.refresh(announcement)
+        await db.commit()
+        await db.refresh(announcement)
         return announcement
 
     @staticmethod
-    def get_all_announcements(
-        db: Session,
+    async def get_all_announcements(
+        db: AsyncSession,
         skip: int = 0,
         limit: int = 20,
         is_active: Optional[bool] = None
     ) -> Tuple[List[Announcement], int]:
-        """Get all announcements"""
-        query = db.query(Announcement)
+        """Async: Get all announcements"""
+        query = select(Announcement)
         
         if is_active is not None:
             query = query.filter(Announcement.is_active == is_active)
         
-        total = query.count()
-        announcements = query.order_by(Announcement.created_at.desc()).offset(skip).limit(limit).all()
+        count_result = await db.execute(select(func.count(Announcement.id)))
+        total = count_result.scalar() or 0
+        
+        result = await db.execute(query.order_by(Announcement.created_at.desc()).offset(skip).limit(limit))
+        announcements = result.scalars().all()
         
         return announcements, total
 
     @staticmethod
-    def update_announcement(
-        db: Session,
+    async def update_announcement(
+        db: AsyncSession,
         announcement_id: str,
         announcement_data: dict
     ) -> Optional[Announcement]:
-        """Update an announcement"""
-        announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
+        """Async: Update an announcement"""
+        result = await db.execute(select(Announcement).filter(Announcement.id == announcement_id))
+        announcement = result.scalar_one_or_none()
         
         if not announcement:
             return None
@@ -372,30 +403,32 @@ class AdminService:
             if hasattr(announcement, key):
                 setattr(announcement, key, value)
         
-        db.commit()
-        db.refresh(announcement)
+        await db.commit()
+        await db.refresh(announcement)
         return announcement
 
     @staticmethod
-    def delete_announcement(db: Session, announcement_id: str) -> bool:
-        """Delete an announcement"""
-        announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
+    async def delete_announcement(db: AsyncSession, announcement_id: str) -> bool:
+        """Async: Delete an announcement"""
+        result = await db.execute(select(Announcement).filter(Announcement.id == announcement_id))
+        announcement = result.scalar_one_or_none()
         
         if not announcement:
             return False
         
-        db.delete(announcement)
-        db.commit()
+        await db.delete(announcement)
+        await db.commit()
         return True
 
     @staticmethod
-    def get_all_departments(db: Session) -> List[Department]:
-        """Get all departments"""
-        return db.query(Department).filter(Department.is_active == True).all()
+    async def get_all_departments(db: AsyncSession) -> List[Department]:
+        """Async: Get all departments"""
+        result = await db.execute(select(Department).filter(Department.is_active == True))
+        return result.scalars().all()
 
     @staticmethod
-    def create_department(db: Session, department_data: dict) -> Department:
-        """Create a new department"""
+    async def create_department(db: AsyncSession, department_data: dict) -> Department:
+        """Async: Create a new department"""
         department = Department(
             name=department_data["name"],
             code=department_data["code"],
@@ -405,18 +438,19 @@ class AdminService:
         )
         
         db.add(department)
-        db.commit()
-        db.refresh(department)
+        await db.commit()
+        await db.refresh(department)
         return department
 
     @staticmethod
-    def update_department(
-        db: Session,
+    async def update_department(
+        db: AsyncSession,
         department_id: str,
         department_data: dict
     ) -> Optional[Department]:
-        """Update a department"""
-        department = db.query(Department).filter(Department.id == department_id).first()
+        """Async: Update a department"""
+        result = await db.execute(select(Department).filter(Department.id == department_id))
+        department = result.scalar_one_or_none()
         
         if not department:
             return None
@@ -425,33 +459,34 @@ class AdminService:
             if hasattr(department, key):
                 setattr(department, key, value)
         
-        db.commit()
-        db.refresh(department)
+        await db.commit()
+        await db.refresh(department)
         return department
 
     @staticmethod
-    def delete_department(db: Session, department_id: str) -> bool:
-        """Delete a department"""
-        department = db.query(Department).filter(Department.id == department_id).first()
+    async def delete_department(db: AsyncSession, department_id: str) -> bool:
+        """Async: Delete a department"""
+        result = await db.execute(select(Department).filter(Department.id == department_id))
+        department = result.scalar_one_or_none()
         
         if not department:
             return False
         
-        db.delete(department)
-        db.commit()
+        await db.delete(department)
+        await db.commit()
         return True
 
     @staticmethod
-    def get_audit_logs(
-        db: Session,
+    async def get_audit_logs(
+        db: AsyncSession,
         skip: int = 0,
         limit: int = 50,
         user_id: Optional[str] = None,
         action: Optional[str] = None,
         resource_type: Optional[str] = None
     ) -> Tuple[List[AuditLog], int]:
-        """Get audit logs"""
-        query = db.query(AuditLog)
+        """Async: Get audit logs"""
+        query = select(AuditLog)
         
         if user_id:
             query = query.filter(AuditLog.user_id == user_id)
@@ -462,7 +497,10 @@ class AdminService:
         if resource_type:
             query = query.filter(AuditLog.resource_type == resource_type)
         
-        total = query.count()
-        logs = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+        count_result = await db.execute(select(func.count(AuditLog.id)))
+        total = count_result.scalar() or 0
+        
+        result = await db.execute(query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
+        logs = result.scalars().all()
         
         return logs, total

@@ -1,24 +1,27 @@
 """
-Analytics service
+Analytics service - Async compatible
 """
 from typing import List, Dict, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 from app.models.analytics import Analytics, AccessibilityUsage
 from app.models.progress import Progress
 from app.models.course import Enrollment
+from app.models.user import User
+from app.models.course import Course
 from datetime import datetime, timedelta
 import uuid
 
 
 class AnalyticsService:
     @staticmethod
-    def get_performance_analytics(
-        db: Session,
+    async def get_performance_analytics(
+        db: AsyncSession,
         user_id: str,
         period: str = "month",
         course_id: str = None
     ) -> Dict[str, Any]:
+        """Async: Get performance analytics for user"""
         # Calculate date range
         end_date = datetime.utcnow()
         if period == "week":
@@ -29,11 +32,12 @@ class AnalyticsService:
             start_date = end_date - timedelta(days=120)
         
         # Get user progress records
-        query = db.query(Progress).filter(Progress.user_id == user_id)
+        query = select(Progress).filter(Progress.user_id == user_id)
         if course_id:
             query = query.filter(Progress.course_id == course_id)
         
-        progress_records = query.all()
+        result = await db.execute(query)
+        progress_records = result.scalars().all()
         
         # Calculate overview metrics
         total_time_spent = sum(p.time_spent for p in progress_records)
@@ -78,19 +82,21 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_accessibility_analytics(db: Session, user_id: str) -> Dict[str, Any]:
+    async def get_accessibility_analytics(db: AsyncSession, user_id: str) -> Dict[str, Any]:
+        """Async: Get accessibility analytics"""
         # Get or create accessibility usage record
-        usage = db.query(AccessibilityUsage).filter(
+        result = await db.execute(select(AccessibilityUsage).filter(
             AccessibilityUsage.user_id == user_id
-        ).first()
+        ))
+        usage = result.scalar_one_or_none()
         
         if not usage:
             usage = AccessibilityUsage(
                 user_id=user_id
             )
             db.add(usage)
-            db.commit()
-            db.refresh(usage)
+            await db.commit()
+            await db.refresh(usage)
         
         return {
             "feature_usage": {
@@ -104,14 +110,16 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def update_accessibility_usage(
-        db: Session,
+    async def update_accessibility_usage(
+        db: AsyncSession,
         user_id: str,
         feature: str
     ):
-        usage = db.query(AccessibilityUsage).filter(
+        """Async: Update accessibility feature usage"""
+        result = await db.execute(select(AccessibilityUsage).filter(
             AccessibilityUsage.user_id == user_id
-        ).first()
+        ))
+        usage = result.scalar_one_or_none()
         
         if not usage:
             usage = AccessibilityUsage(
@@ -129,23 +137,27 @@ class AnalyticsService:
         elif feature == "high_contrast":
             usage.high_contrast_usage += 1
         
-        db.commit()
+        await db.commit()
 
     @staticmethod
-    def get_admin_dashboard_stats(db: Session) -> Dict[str, Any]:
+    async def get_admin_dashboard_stats(db: AsyncSession) -> Dict[str, Any]:
+        """Async: Get admin dashboard statistics"""
         # Get basic stats
-        from app.models.user import User
-        from app.models.course import Course, Enrollment
+        total_users_result = await db.execute(select(func.count(User.id)))
+        total_users = total_users_result.scalar() or 0
         
-        total_users = db.query(func.count(User.id)).scalar()
-        total_courses = db.query(func.count(Course.id)).scalar()
-        total_enrollments = db.query(func.count(Enrollment.id)).scalar()
+        total_courses_result = await db.execute(select(func.count(Course.id)))
+        total_courses = total_courses_result.scalar() or 0
+        
+        total_enrollments_result = await db.execute(select(func.count(Enrollment.id)))
+        total_enrollments = total_enrollments_result.scalar() or 0
         
         # Active users (logged in within last 30 days)
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        active_users = db.query(func.count(User.id)).filter(
+        active_users_result = await db.execute(select(func.count(User.id)).filter(
             User.last_login >= thirty_days_ago
-        ).scalar()
+        ))
+        active_users = active_users_result.scalar() or 0
         
         return {
             "stats": {
