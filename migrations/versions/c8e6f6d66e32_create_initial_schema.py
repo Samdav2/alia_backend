@@ -1,7 +1,7 @@
 """create_initial_schema
 
 Revision ID: c8e6f6d66e32
-Revises: 
+Revises:
 Create Date: 2026-03-25 08:22:23.775502
 
 """
