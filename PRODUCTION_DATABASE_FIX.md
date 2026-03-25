@@ -23,16 +23,16 @@ try:
     logger.info("Running database migrations...")
     import subprocess
     import os
-    
+
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     result = subprocess.run(
         ["alembic", "upgrade", "head"],
         cwd=project_dir,
         capture_output=True,
         text=True
     )
-    
+
     if result.returncode == 0:
         logger.info("✓ Database migrations completed successfully")
     else:
@@ -48,11 +48,11 @@ Modified the migration environment to convert async PostgreSQL URLs to sync:
 def get_url():
     settings = get_settings()
     url = settings.database_url
-    
+
     # Convert async PostgreSQL URL to sync for Alembic
     if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://")
-    
+
     return url
 ```
 
