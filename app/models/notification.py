@@ -49,4 +49,4 @@ class Notification(Base, table=True):
     )
 
     # Relationships
-    user: "User" = Relationship(back_populates="notifications")
+    user: User = Relationship(back_populates="notifications")

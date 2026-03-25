@@ -33,4 +33,4 @@ class AuditLog(Base, table=True):
     )
 
     # Relationships
-    user: Optional["User"] = Relationship()
+    user: Optional[User] = Relationship()

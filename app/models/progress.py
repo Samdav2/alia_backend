@@ -50,9 +50,9 @@ class Progress(Base, table=True):
     )
 
     # Relationships
-    user: "User" = Relationship(back_populates="progress_records")
-    course: "Course" = Relationship(back_populates="progress_records")
-    topic_progress: List["TopicProgress"] = Relationship(back_populates="progress")
+    user: User = Relationship(back_populates="progress_records")
+    course: Course = Relationship(back_populates="progress_records")
+    topic_progress: List[TopicProgress] = Relationship(back_populates="progress")
 
 class TopicProgress(Base, table=True):
     __tablename__ = "topic_progress"
@@ -89,5 +89,5 @@ class TopicProgress(Base, table=True):
     )
 
     # Relationships
-    progress: "Progress" = Relationship(back_populates="topic_progress")
-    topic: "Topic" = Relationship(back_populates="topic_progress")
+    progress: Progress = Relationship(back_populates="topic_progress")
+    topic: Topic = Relationship(back_populates="topic_progress")

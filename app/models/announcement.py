@@ -40,4 +40,4 @@ class Announcement(Base, table=True):
     )
 
     # Relationships
-    author: Optional["User"] = Relationship()
+    author: Optional[User] = Relationship()

@@ -63,10 +63,10 @@ class Course(Base, table=True):
     )
 
     # Relationships
-    instructor: Optional["User"] = Relationship(back_populates="courses_taught")
-    modules: List["Module"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    enrollments: List["Enrollment"] = Relationship(back_populates="course")
-    progress_records: List["Progress"] = Relationship(back_populates="course")
+    instructor: Optional[User] = Relationship(back_populates="courses_taught")
+    modules: List[Module] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    enrollments: List[Enrollment] = Relationship(back_populates="course")
+    progress_records: List[Progress] = Relationship(back_populates="course")
 
 class Module(Base, table=True):
     __tablename__ = "modules"
@@ -131,9 +131,9 @@ class Topic(Base, table=True):
     )
 
     # Relationships
-    module: "Module" = Relationship(back_populates="topics")
-    topic_progress: List["TopicProgress"] = Relationship(back_populates="topic")
-    assessments: List["Quiz"] = Relationship(back_populates="topic", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    module: Module = Relationship(back_populates="topics")
+    topic_progress: List[TopicProgress] = Relationship(back_populates="topic")
+    assessments: List[Quiz] = Relationship(back_populates="topic", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Enrollment(Base, table=True):
     __tablename__ = "enrollments"
@@ -160,5 +160,5 @@ class Enrollment(Base, table=True):
     )
 
     # Relationships
-    user: "User" = Relationship(back_populates="enrollments")
-    course: "Course" = Relationship(back_populates="enrollments")
+    user: User = Relationship(back_populates="enrollments")
+    course: Course = Relationship(back_populates="enrollments")
