@@ -3,7 +3,8 @@ Course management service - Async compatible
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, or_, select
+from sqlalchemy.orm import selectinload
+from sqlalchemy import func, or_, select, and_
 from app.models.course import Course, Module, Topic, Enrollment
 from app.models.user import User
 from app.schemas.course import CourseCreate, CourseUpdate
@@ -48,11 +49,18 @@ class CourseService:
 
     @staticmethod
     async def get_course_by_id(db: AsyncSession, course_id: str) -> Optional[Course]:
-        """Async: Get course by ID"""
-        result = await db.execute(select(Course).filter(
+        """Async: Get course by ID with all relationships loaded"""
+        from app.models.course import Module, Topic
+
+        stmt = select(Course).filter(
             Course.id == course_id,
             Course.is_active == True
-        ))
+        ).options(
+            selectinload(Course.modules)
+            .selectinload(Module.topics)
+            .selectinload(Topic.assessments)
+        )
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod

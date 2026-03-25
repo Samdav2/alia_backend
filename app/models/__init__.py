@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .user import User, UserRole
 from .course import Course, Module, Topic, Enrollment
 from .progress import Progress, TopicProgress

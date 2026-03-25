@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Async Database configuration and session management for PostgreSQL
 """
@@ -85,7 +86,8 @@ else:
         logger.info("Database engine disposed")
 
 # Base class for models - Using SQLModel
-Base = SQLModel
+class Base(SQLModel):
+    pass
 
 # Redis connection for caching and rate limiting (async)
 redis_client = None

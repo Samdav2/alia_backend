@@ -105,17 +105,32 @@ async def http_exception_handler(request: Request, exc: Exception):
         if settings.debug:
             details = traceback.format_exc()
 
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "error": {
-                    "code": "INTERNAL_ERROR",
-                    "message": f"An internal error occurred: {str(exc)}",
-                    "details": details
+        try:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": f"An internal error occurred: {str(exc)}",
+                        "details": details
+                    }
                 }
-            }
-        )
+            )
+        except Exception as e:
+            logger.error(f"Error stringifying details for JSONResponse: {e}")
+            # If everything else fails, return a plain JSON response without complex details
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": "An internal error occurred",
+                        "details": str(details) if details else None
+                    }
+                }
+            )
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

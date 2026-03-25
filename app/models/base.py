@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Base model utilities and shared types
 """

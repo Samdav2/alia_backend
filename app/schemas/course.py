@@ -23,12 +23,32 @@ class AssessmentQuestion(BaseModel):
     correct_answer: str
     explanation: Optional[str] = None
 
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+    class Config:
+        from_attributes = True
+
 
 class Assessment(BaseModel):
     id: str
     type: str  # quiz, assignment
     title: str
     questions: List[AssessmentQuestion]
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+    class Config:
+        from_attributes = True
 
 
 class TopicBase(BaseModel):

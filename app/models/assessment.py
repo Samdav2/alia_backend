@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
@@ -18,6 +19,7 @@ class Quiz(Base, table=True):
         index=True,
         nullable=False
     )
+    type: str = Field(default="quiz")
     title: str = Field(nullable=False)
     description: Optional[str] = Field(default=None, sa_column=Column(Text))
     topic_id: uuid.UUID = Field(foreign_key="topics.id")
@@ -38,7 +40,7 @@ class Quiz(Base, table=True):
     )
 
     # Relationships
-    topic: Optional["Topic"] = Relationship()
+    topic: Optional["Topic"] = Relationship(back_populates="assessments")
     attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
 
 class QuizAttempt(Base, table=True):

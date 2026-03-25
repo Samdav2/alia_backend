@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
@@ -9,6 +10,7 @@ from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateT
 if TYPE_CHECKING:
     from .user import User
     from .progress import Progress
+    from .assessment import Quiz
 
 class CourseLevel(str, enum.Enum):
     BEGINNER = "beginner"
@@ -131,6 +133,7 @@ class Topic(Base, table=True):
     # Relationships
     module: "Module" = Relationship(back_populates="topics")
     topic_progress: List["TopicProgress"] = Relationship(back_populates="topic")
+    assessments: List["Quiz"] = Relationship(back_populates="topic", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Enrollment(Base, table=True):
     __tablename__ = "enrollments"
