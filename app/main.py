@@ -57,6 +57,32 @@ async def lifespan(app: FastAPI):
         logger.error(f"✗ Database connection failed: {e}")
         raise
 
+    # Run Alembic migrations automatically on startup
+    try:
+        logger.info("Running database migrations...")
+        import subprocess
+        import os
+
+        # Get the project directory
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # Run alembic upgrade head
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            logger.info("✓ Database migrations completed successfully")
+        else:
+            logger.warning(f"Migration output: {result.stdout}\n{result.stderr}")
+    except Exception as e:
+        logger.error(f"⚠ Migration warning (may be normal): {e}")
+        # Don't fail startup if migrations can't run, as they may already be applied
+        pass
+
     yield
 
     # Shutdown

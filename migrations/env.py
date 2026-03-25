@@ -32,7 +32,13 @@ target_metadata = Base.metadata
 
 def get_url():
     settings = get_settings()
-    return settings.database_url
+    url = settings.database_url
+
+    # Convert async PostgreSQL URL to sync for Alembic
+    if url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
+
+    return url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -67,7 +73,7 @@ def run_migrations_online() -> None:
     """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
-    
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
