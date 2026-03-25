@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 Async Database configuration and session management for PostgreSQL
 """

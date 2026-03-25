@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
@@ -40,8 +39,8 @@ class Quiz(Base, table=True):
     )
 
     # Relationships
-    topic: Optional[Topic] = Relationship(back_populates="assessments")
-    attempts: List[QuizAttempt] = Relationship(back_populates="quiz")
+    topic: Optional["Topic"] = Relationship(back_populates="assessments")
+    attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
 
 class QuizAttempt(Base, table=True):
     __tablename__ = "quiz_attempts"
@@ -67,5 +66,5 @@ class QuizAttempt(Base, table=True):
     time_taken: Optional[int] = Field(default=None)  # in seconds
 
     # Relationships
-    quiz: Quiz = Relationship(back_populates="attempts")
-    user: User = Relationship()
+    quiz: "Quiz" = Relationship(back_populates="attempts")
+    user: "User" = Relationship()

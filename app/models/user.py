@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
@@ -78,9 +77,9 @@ class User(Base, table=True):
 
     # Relationships
     # Note: Use string forward references for other models to avoid circular imports
-    courses_taught: List[Course] = Relationship(back_populates="instructor")
-    enrollments: List[Enrollment] = Relationship(back_populates="user")
-    progress_records: List[Progress] = Relationship(back_populates="user")
-    analytics: List[Analytics] = Relationship(back_populates="user")
-    notifications: List[Notification] = Relationship(back_populates="user")
-    accessibility_usage: List[AccessibilityUsage] = Relationship(back_populates="user")
+    courses_taught: List["Course"] = Relationship(back_populates="instructor")
+    enrollments: List["Enrollment"] = Relationship(back_populates="user")
+    progress_records: List["Progress"] = Relationship(back_populates="user")
+    analytics: List["Analytics"] = Relationship(back_populates="user")
+    notifications: List["Notification"] = Relationship(back_populates="user")
+    accessibility_usage: List["AccessibilityUsage"] = Relationship(back_populates="user")

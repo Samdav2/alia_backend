@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
@@ -40,4 +39,4 @@ class Announcement(Base, table=True):
     )
 
     # Relationships
-    author: Optional[User] = Relationship()
+    author: Optional["User"] = Relationship()

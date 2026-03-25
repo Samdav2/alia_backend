@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import List, Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
@@ -51,7 +50,7 @@ class Analytics(Base, table=True):
     )
 
     # Relationships
-    user: User = Relationship(back_populates="analytics")
+    user: "User" = Relationship(back_populates="analytics")
 
 class AccessibilityUsage(Base, table=True):
     __tablename__ = "accessibility_usage"
@@ -91,4 +90,4 @@ class AccessibilityUsage(Base, table=True):
     )
 
     # Relationships
-    user: User = Relationship(back_populates="accessibility_usage")
+    user: "User" = Relationship(back_populates="accessibility_usage")

@@ -1,4 +1,3 @@
-from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, Any, Dict, TYPE_CHECKING
 from datetime import datetime
@@ -33,4 +32,4 @@ class AuditLog(Base, table=True):
     )
 
     # Relationships
-    user: Optional[User] = Relationship()
+    user: Optional["User"] = Relationship()
