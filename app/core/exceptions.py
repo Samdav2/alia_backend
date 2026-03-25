@@ -6,7 +6,10 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic_core import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 import logging
+import traceback
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,7 @@ async def http_exception_handler(request: Request, exc: Exception):
             429: "RATE_LIMIT_EXCEEDED",
             500: "INTERNAL_ERROR"
         }
-        
+
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -80,7 +83,7 @@ async def http_exception_handler(request: Request, exc: Exception):
                 }
             }
         )
-    elif isinstance(exc, ValidationError):
+    elif isinstance(exc, (ValidationError, PydanticValidationError)):
         # Handle Pydantic validation errors
         return JSONResponse(
             status_code=422,
@@ -95,15 +98,21 @@ async def http_exception_handler(request: Request, exc: Exception):
         )
     else:
         # Handle other exceptions
-        logger.error(f"Unhandled exception: {exc}")
+        logger.exception(f"Unhandled exception: {exc}")
+
+        settings = get_settings()
+        details = None
+        if settings.debug:
+            details = traceback.format_exc()
+
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "error": {
                     "code": "INTERNAL_ERROR",
-                    "message": "An internal error occurred",
-                    "details": None
+                    "message": f"An internal error occurred: {str(exc)}",
+                    "details": details
                 }
             }
         )

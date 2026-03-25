@@ -67,20 +67,35 @@ class AuthService:
     @staticmethod
     async def create_user(db: AsyncSession, user_data: dict) -> User:
         """Async: Create a new user"""
-        # Create user with UUID
-        db_user = User(
-            full_name=user_data["full_name"],
-            email=user_data["email"],
-            hashed_password=AuthService.get_password_hash(user_data["password"]),
-            role=user_data["role"],
-            department=user_data["department"],
-            student_id=user_data.get("student_id")
-        )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Creating user with data: {user_data}")
 
-        db.add(db_user)
-        await db.commit()
-        await db.refresh(db_user)
-        return db_user
+        try:
+            # Create user with UUID
+            db_user = User(
+                full_name=user_data["full_name"],
+                email=user_data["email"],
+                hashed_password=AuthService.get_password_hash(user_data["password"]),
+                role=user_data["role"],
+                department=user_data.get("department"),
+                student_id=user_data.get("student_id")
+            )
+            logger.debug("User object created successfully in memory")
+        except Exception as e:
+            logger.error(f"Error creating User object: {e}")
+            raise
+
+        try:
+            db.add(db_user)
+            await db.commit()
+            await db.refresh(db_user)
+            logger.info(f"User {db_user.email} created successfully in DB")
+            return db_user
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Database error during user creation: {e}")
+            raise
 
     @staticmethod
     async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:

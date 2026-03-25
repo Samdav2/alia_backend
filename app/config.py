@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     auth_rate_limit_per_minute: int = 5
 
     # Logging
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
 
     class Config:
         env_file = ".env"
