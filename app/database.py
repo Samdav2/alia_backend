@@ -1,9 +1,8 @@
 """
 Async Database configuration and session management for PostgreSQL
 """
+from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import MetaData
 import redis.asyncio as redis
 from app.config import get_settings
 import logging
@@ -16,9 +15,7 @@ is_sqlite = settings.database_url.startswith("sqlite")
 
 if is_sqlite:
     # SQLite configuration (synchronous for development)
-    from sqlalchemy import create_engine
     from sqlalchemy.pool import StaticPool
-    from sqlalchemy.orm import sessionmaker
 
     engine = create_engine(
         settings.database_url,
@@ -26,14 +23,10 @@ if is_sqlite:
         poolclass=StaticPool,
         echo=settings.debug
     )
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    async def get_db():
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+    def get_db():
+        with Session(engine) as session:
+            yield session
 
     async def dispose_engine():
         """Dispose the sync engine"""
@@ -91,8 +84,9 @@ else:
         await engine.dispose()
         logger.info("Database engine disposed")
 
-# Base class for models
-Base = declarative_base()
+# Base class for models - Using SQLModel
+class Base(SQLModel):
+    pass
 
 # Redis connection for caching and rate limiting (async)
 redis_client = None

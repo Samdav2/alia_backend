@@ -1,48 +1,10 @@
-"""
-Notification model
-"""
-from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean, Text, Enum
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.types import TypeDecorator, CHAR
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+from sqlmodel import Field, Relationship, SQLModel
+from typing import Optional
+from datetime import datetime
 import enum
 import uuid
-
-
-# UUID type that works with both SQLite and PostgreSQL
-class GUID(TypeDecorator):
-    """Platform-independent GUID type."""
-    impl = CHAR
-    cache_ok = True
-
-    def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(PG_UUID(as_uuid=True))
-        else:
-            return dialect.type_descriptor(CHAR(36))
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return value
-        elif dialect.name == 'postgresql':
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return str(uuid.UUID(value))
-            else:
-                return str(value)
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return uuid.UUID(value)
-            else:
-                return value
-
+from app.database import Base
+from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean, Text, Enum, func
 
 class NotificationType(str, enum.Enum):
     COURSE_UPDATE = "course_update"
@@ -50,23 +12,37 @@ class NotificationType(str, enum.Enum):
     ACHIEVEMENT = "achievement"
     SYSTEM = "system"
 
-
-class Notification(Base):
+class Notification(Base, table=True):
     __tablename__ = "notifications"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(GUID(), ForeignKey("users.id"))
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    user_id: uuid.UUID = Field(foreign_key="users.id")
+
     # Notification details
-    type = Column(String, default=NotificationType.SYSTEM)
-    title = Column(String, nullable=False)
-    message = Column(Text, nullable=False)
-    action_url = Column(String)
-    is_read = Column(Boolean, default=False)
-    
+    # Use sa_column for Enum to ensure it's handled correctly by SQLAlchemy/PostgreSQL
+    type: NotificationType = Field(
+        default=NotificationType.SYSTEM,
+        sa_column=Column(Enum(NotificationType))
+    )
+    title: str = Field(nullable=False)
+    message: str = Field(sa_column=Column(Text, nullable=False))
+    action_url: Optional[str] = Field(default=None)
+    is_read: bool = Field(default=False)
+
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    read_at = Column(DateTime(timezone=True))
-    
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    read_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+
     # Relationships
-    user = relationship("User", back_populates="notifications")
+    user: "User" = Relationship(back_populates="notifications")

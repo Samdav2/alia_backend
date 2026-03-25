@@ -19,8 +19,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    # Database - SQLite by default, easily switchable to PostgreSQL
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./alia.db")
+    # Database - External PostgreSQL
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql://samdav:A0RQspljYlfxHlk9IcWW9rxfA6pauyuw@dpg-d71n9iu3jp1c739eokg0-a.ohio-postgres.render.com/alia"
+    )
 
     # Redis (for caching and rate limiting)
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")

@@ -1,98 +1,90 @@
-"""
-Analytics and accessibility usage models
-"""
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, JSON, Boolean
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.types import TypeDecorator, CHAR
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+from sqlmodel import Field, Relationship, SQLModel
+from typing import List, Optional, Any, Dict
+from datetime import datetime
 import uuid
+from app.database import Base
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, JSON, Boolean, func
 
-
-# UUID type that works with both SQLite and PostgreSQL
-class GUID(TypeDecorator):
-    """Platform-independent GUID type."""
-    impl = CHAR
-    cache_ok = True
-
-    def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(PG_UUID(as_uuid=True))
-        else:
-            return dialect.type_descriptor(CHAR(36))
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return value
-        elif dialect.name == 'postgresql':
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return str(uuid.UUID(value))
-            else:
-                return str(value)
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return uuid.UUID(value)
-            else:
-                return value
-
-
-class Analytics(Base):
+class Analytics(Base, table=True):
     __tablename__ = "analytics"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(GUID(), ForeignKey("users.id"))
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    user_id: uuid.UUID = Field(foreign_key="users.id")
+
     # Performance metrics
-    total_time_spent = Column(Integer, default=0)  # in minutes
-    courses_completed = Column(Integer, default=0)
-    average_score = Column(Float, default=0.0)
-    streak_days = Column(Integer, default=0)
-    
+    total_time_spent: int = Field(default=0)  # in minutes
+    courses_completed: int = Field(default=0)
+    average_score: float = Field(default=0.0)
+    streak_days: int = Field(default=0)
+
     # Weekly activity data
-    weekly_activity = Column(JSON, default=[])
-    
+    weekly_activity: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
+
     # Course-specific progress
-    course_progress = Column(JSON, default=[])
-    
+    course_progress: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
+
     # Timestamps
-    period_start = Column(DateTime(timezone=True))
-    period_end = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    period_start: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+    period_end: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
     # Relationships
-    user = relationship("User", back_populates="analytics")
+    user: "User" = Relationship(back_populates="analytics")
 
-
-class AccessibilityUsage(Base):
+class AccessibilityUsage(Base, table=True):
     __tablename__ = "accessibility_usage"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(GUID(), ForeignKey("users.id"))
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    user_id: uuid.UUID = Field(foreign_key="users.id")
+
     # Feature usage counters
-    bionic_reading_usage = Column(Integer, default=0)
-    voice_navigation_usage = Column(Integer, default=0)
-    text_to_speech_usage = Column(Integer, default=0)
-    high_contrast_usage = Column(Integer, default=0)
-    
+    bionic_reading_usage: int = Field(default=0)
+    voice_navigation_usage: int = Field(default=0)
+    text_to_speech_usage: int = Field(default=0)
+    high_contrast_usage: int = Field(default=0)
+
     # Accessibility score
-    accessibility_score = Column(Float, default=0.0)
-    
+    accessibility_score: float = Field(default=0.0)
+
     # Recommendations
-    recommendations = Column(JSON, default=[])
-    
+    recommendations: List[str] = Field(default=[], sa_column=Column(JSON))
+
     # Timestamps
-    date = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    date: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
     # Relationships
-    user = relationship("User", back_populates="accessibility_usage")
+    user: "User" = Relationship(back_populates="accessibility_usage")

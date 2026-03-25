@@ -1,117 +1,157 @@
-"""
-Course, Module, Topic, and Enrollment models
-"""
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime, JSON, Float, Enum
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
-from app.models.base import GUID
+from sqlmodel import Field, Relationship, SQLModel
+from typing import List, Optional, Any, Dict
+from datetime import datetime
 import enum
 import uuid
-
+from app.database import Base
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime, JSON, Float, Enum, func
 
 class CourseLevel(str, enum.Enum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
 
-
 class EnrollmentStatus(str, enum.Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     DROPPED = "dropped"
-
 
 class ContentType(str, enum.Enum):
     TEXT = "text"
     VIDEO = "video"
     INTERACTIVE = "interactive"
 
-
-class Course(Base):
+class Course(Base, table=True):
     __tablename__ = "courses"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    code = Column(String, unique=True, index=True, nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    department = Column(String, nullable=False)
-    level = Column(String, default=CourseLevel.BEGINNER)
-    duration = Column(String)  # e.g., "12 weeks"
-    tags = Column(JSON, default=[])
-    thumbnail = Column(String)
-    is_active = Column(Boolean, default=True)
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    code: str = Field(unique=True, index=True, nullable=False)
+    title: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    department: str = Field(nullable=False)
+    level: CourseLevel = Field(
+        default=CourseLevel.BEGINNER,
+        sa_column=Column(Enum(CourseLevel))
+    )
+    duration: Optional[str] = Field(default=None)  # e.g., "12 weeks"
+    tags: List[str] = Field(default=[], sa_column=Column(JSON))
+    thumbnail: Optional[str] = Field(default=None)
+    is_active: bool = Field(default=True)
+
     # Instructor
-    instructor_id = Column(GUID(), ForeignKey("users.id"))
-    
+    instructor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
+
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
     # Relationships
-    instructor = relationship("User", back_populates="courses_taught")
-    modules = relationship("Module", back_populates="course", cascade="all, delete-orphan")
-    enrollments = relationship("Enrollment", back_populates="course")
-    progress_records = relationship("Progress", back_populates="course")
+    instructor: Optional["User"] = Relationship(back_populates="courses_taught")
+    modules: List["Module"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    enrollments: List["Enrollment"] = Relationship(back_populates="course")
+    progress_records: List["Progress"] = Relationship(back_populates="course")
 
-
-class Module(Base):
+class Module(Base, table=True):
     __tablename__ = "modules"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    order = Column(Integer, nullable=False)
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    title: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    order: int = Field(nullable=False)
+
     # Course relationship
-    course_id = Column(GUID(), ForeignKey("courses.id"))
-    
+    course_id: uuid.UUID = Field(foreign_key="courses.id")
+
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
     # Relationships
-    course = relationship("Course", back_populates="modules")
-    topics = relationship("Topic", back_populates="module", cascade="all, delete-orphan")
+    course: "Course" = Relationship(back_populates="modules")
+    topics: List["Topic"] = Relationship(back_populates="module", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
-
-class Topic(Base):
+class Topic(Base, table=True):
     __tablename__ = "topics"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    duration = Column(String)  # e.g., "30 minutes"
-    order = Column(Integer, nullable=False)
-    content_type = Column(String, default=ContentType.TEXT)
-    content = Column(Text)
-    media_files = Column(JSON, default=[])
-    prerequisites = Column(JSON, default=[])
-    learning_objectives = Column(JSON, default=[])
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    title: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    duration: Optional[str] = Field(default=None)  # e.g., "30 minutes"
+    order: int = Field(nullable=False)
+    content_type: str = Field(default=ContentType.TEXT)
+    content: Optional[str] = Field(default=None, sa_column=Column(Text))
+    media_files: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
+    prerequisites: List[str] = Field(default=[], sa_column=Column(JSON))
+    learning_objectives: List[str] = Field(default=[], sa_column=Column(JSON))
+
     # Module relationship
-    module_id = Column(GUID(), ForeignKey("modules.id"))
-    
+    module_id: uuid.UUID = Field(foreign_key="modules.id")
+
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
     # Relationships
-    module = relationship("Module", back_populates="topics")
-    topic_progress = relationship("TopicProgress", back_populates="topic")
+    module: "Module" = Relationship(back_populates="topics")
+    topic_progress: List["TopicProgress"] = Relationship(back_populates="topic")
 
-
-class Enrollment(Base):
+class Enrollment(Base, table=True):
     __tablename__ = "enrollments"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(GUID(), ForeignKey("users.id"))
-    course_id = Column(GUID(), ForeignKey("courses.id"))
-    status = Column(String, default=EnrollmentStatus.ACTIVE)
-    enrollment_date = Column(DateTime(timezone=True), server_default=func.now())
-    completion_date = Column(DateTime(timezone=True))
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    user_id: uuid.UUID = Field(foreign_key="users.id")
+    course_id: uuid.UUID = Field(foreign_key="courses.id")
+    status: EnrollmentStatus = Field(
+        default=EnrollmentStatus.ACTIVE,
+        sa_column=Column(Enum(EnrollmentStatus))
+    )
+    enrollment_date: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    completion_date: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+
     # Relationships
-    user = relationship("User", back_populates="enrollments")
-    course = relationship("Course", back_populates="enrollments")
+    user: "User" = Relationship(back_populates="enrollments")
+    course: "Course" = Relationship(back_populates="enrollments")

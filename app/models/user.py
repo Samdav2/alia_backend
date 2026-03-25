@@ -1,97 +1,77 @@
-"""
-User model and related enums
-"""
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Enum, Text
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.types import TypeDecorator, CHAR
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+from sqlmodel import Field, Relationship, SQLModel
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 import enum
 import uuid
-
-
-# UUID type that works with both SQLite and PostgreSQL
-class GUID(TypeDecorator):
-    """Platform-independent GUID type.
-    Uses PostgreSQL's UUID type, otherwise uses CHAR(36), storing as stringified hex values.
-    """
-    impl = CHAR
-    cache_ok = True
-
-    def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(PG_UUID(as_uuid=True))
-        else:
-            return dialect.type_descriptor(CHAR(36))
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return value
-        elif dialect.name == 'postgresql':
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return str(uuid.UUID(value))
-            else:
-                return str(value)
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return value
-        else:
-            if not isinstance(value, uuid.UUID):
-                return uuid.UUID(value)
-            else:
-                return value
-
+from app.database import Base
+from sqlalchemy import Column, JSON, Enum, DateTime, func, Text, String
 
 class UserRole(str, enum.Enum):
     STUDENT = "student"
     LECTURER = "lecturer"
     ADMIN = "admin"
 
-
-class User(Base):
+class User(Base, table=True):
     __tablename__ = "users"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
-    full_name = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.STUDENT)
-    department = Column(String)
-    student_id = Column(String, unique=True, nullable=True)
-    is_active = Column(Boolean, default=True)
-    
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False
+    )
+    full_name: str = Field(nullable=False)
+    email: str = Field(unique=True, index=True, nullable=False)
+    hashed_password: str = Field(nullable=False)
+    role: UserRole = Field(default=UserRole.STUDENT, sa_column=Column(Enum(UserRole)))
+    department: Optional[str] = Field(default=None)
+    student_id: Optional[str] = Field(default=None, unique=True)
+    is_active: bool = Field(default=True)
+
     # Preferences
-    preferences = Column(JSON, default={
-        "language": "English",
-        "accessibility": {
-            "bionicReading": False,
-            "dyslexiaFont": False,
-            "highContrast": "none",
-            "voiceNavigation": False
-        }
-    })
-    
+    preferences: Dict[str, Any] = Field(
+        default={
+            "language": "English",
+            "accessibility": {
+                "bionicReading": False,
+                "dyslexiaFont": False,
+                "highContrast": "none",
+                "voiceNavigation": False
+            }
+        },
+        sa_column=Column(JSON)
+    )
+
     # Disability information
-    disability_info = Column(JSON, default={
-        "hasDisability": False,
-        "disabilityType": [],
-        "assistiveTechnology": [],
-        "accommodationsNeeded": []
-    })
-    
+    disability_info: Dict[str, Any] = Field(
+        default={
+            "hasDisability": False,
+            "disabilityType": [],
+            "assistiveTechnology": [],
+            "accommodationsNeeded": []
+        },
+        sa_column=Column(JSON)
+    )
+
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    last_login = Column(DateTime(timezone=True))
-    
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+    last_login: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+
     # Relationships
-    courses_taught = relationship("Course", back_populates="instructor")
-    enrollments = relationship("Enrollment", back_populates="user")
-    progress_records = relationship("Progress", back_populates="user")
-    analytics = relationship("Analytics", back_populates="user")
-    notifications = relationship("Notification", back_populates="user")
-    accessibility_usage = relationship("AccessibilityUsage", back_populates="user")
+    # Note: Use string forward references for other models to avoid circular imports
+    courses_taught: List["Course"] = Relationship(back_populates="instructor")
+    enrollments: List["Enrollment"] = Relationship(back_populates="user")
+    progress_records: List["Progress"] = Relationship(back_populates="user")
+    analytics: List["Analytics"] = Relationship(back_populates="user")
+    notifications: List["Notification"] = Relationship(back_populates="user")
+    accessibility_usage: List["AccessibilityUsage"] = Relationship(back_populates="user")
