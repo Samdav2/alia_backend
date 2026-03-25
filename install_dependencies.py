@@ -71,7 +71,15 @@ packages = [
     "pytest-asyncio==0.21.1",
     "black==23.11.0",
     "isort==5.12.0",
-    "flake8==6.1.0"
+    "flake8==6.1.0",
+    "redis==5.0.1",
+    "slowapi==0.1.9",
+    "Pillow==10.1.0",
+    "openai==1.3.7",
+    "google-generativeai==0.3.2",
+
+
+
 ]
 
 def install(package):
