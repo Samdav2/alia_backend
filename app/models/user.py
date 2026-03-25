@@ -1,10 +1,19 @@
+from __future__ import annotations
 from sqlmodel import Field, Relationship, SQLModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 import enum
 import uuid
 from app.database import Base
 from sqlalchemy import Column, JSON, Enum, DateTime, func, Text, String
+
+if TYPE_CHECKING:
+    from .course import Course
+    from .course import Enrollment
+    from .progress import Progress
+    from .analytics import Analytics
+    from .notification import Notification
+    from .analytics import AccessibilityUsage
 
 class UserRole(str, enum.Enum):
     STUDENT = "student"

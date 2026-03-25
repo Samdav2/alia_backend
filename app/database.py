@@ -85,8 +85,7 @@ else:
         logger.info("Database engine disposed")
 
 # Base class for models - Using SQLModel
-class Base(SQLModel):
-    pass
+Base = SQLModel
 
 # Redis connection for caching and rate limiting (async)
 redis_client = None
