@@ -60,6 +60,7 @@ class TopicBase(BaseModel):
     media_files: List[MediaFile] = []
     prerequisites: List[str] = []
     learning_objectives: List[str] = []
+    available_at: Optional[datetime] = None
 
 
 class TopicCreate(TopicBase):
@@ -72,6 +73,8 @@ class TopicResponse(TopicBase):
     order: int
     module_id: str
     assessments: List[Assessment] = []
+    is_locked: bool = False
+    availability_message: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -89,6 +92,7 @@ class TopicResponse(TopicBase):
 class ModuleBase(BaseModel):
     title: str
     description: Optional[str] = None
+    available_at: Optional[datetime] = None
 
 
 class ModuleCreate(ModuleBase):
@@ -101,6 +105,8 @@ class ModuleResponse(ModuleBase):
     order: int
     course_id: str
     topics: List[TopicResponse] = []
+    is_locked: bool = False
+    availability_message: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

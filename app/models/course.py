@@ -82,6 +82,7 @@ class Module(Base, table=True):
 
     # Course relationship
     course_id: uuid.UUID = Field(foreign_key="courses.id")
+    available_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
 
     # Timestamps
     created_at: datetime = Field(
@@ -118,6 +119,7 @@ class Topic(Base, table=True):
 
     # Module relationship
     module_id: uuid.UUID = Field(foreign_key="modules.id")
+    available_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
 
     # Timestamps
     created_at: datetime = Field(

@@ -3,7 +3,7 @@ Course management service - Async compatible
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func, or_, select, and_
 from app.models.course import Course, Module, Topic, Enrollment
 from app.models.user import User
@@ -64,8 +64,14 @@ class CourseService:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def create_course(db: AsyncSession, course_data: CourseCreate, instructor_id: str) -> Course:
+    async def create_course(db: AsyncSession, course_data: CourseCreate, instructor_id: str) -> Optional[Course]:
         """Async: Create a new course"""
+        # Check if course with same code already exists
+        existing_stmt = select(Course).filter(Course.code == course_data.code)
+        existing_result = await db.execute(existing_stmt)
+        if existing_result.scalar_one_or_none():
+            return None
+
         db_course = Course(
             code=course_data.code,
             title=course_data.title,
@@ -80,8 +86,9 @@ class CourseService:
 
         db.add(db_course)
         await db.commit()
-        await db.refresh(db_course)
-        return db_course
+
+        # Return with relationships loaded to avoid MissingGreenlet in Pydantic serialization
+        return await CourseService.get_course_by_id(db, str(db_course.id))
 
     @staticmethod
     async def update_course(
@@ -105,8 +112,9 @@ class CourseService:
             setattr(course, field, value)
 
         await db.commit()
-        await db.refresh(course)
-        return course
+
+        # Return with relationships loaded to avoid MissingGreenlet in Pydantic serialization
+        return await CourseService.get_course_by_id(db, course_id)
 
     @staticmethod
     async def delete_course(db: AsyncSession, course_id: str, user_role: str) -> bool:
@@ -142,7 +150,9 @@ class CourseService:
 
         db.add(enrollment)
         await db.commit()
-        await db.refresh(enrollment)
+
+        # Return with relationships loaded to avoid MissingGreenlet
+        await db.refresh(enrollment, attribute_names=['user', 'course'])
         return enrollment
 
     @staticmethod
@@ -162,8 +172,12 @@ class CourseService:
 
     @staticmethod
     async def get_user_enrollments(db: AsyncSession, user_id: str) -> List[Enrollment]:
-        """Async: Get user enrollments"""
-        result = await db.execute(select(Enrollment).filter(Enrollment.user_id == user_id))
+        """Async: Get user enrollments with course details"""
+        result = await db.execute(
+            select(Enrollment)
+            .filter(Enrollment.user_id == user_id)
+            .options(joinedload(Enrollment.course))
+        )
         return result.scalars().all()
 
     @staticmethod

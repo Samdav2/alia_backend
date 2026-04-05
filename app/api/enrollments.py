@@ -46,10 +46,29 @@ async def enroll_in_course(
     if not enrollment:
         raise HTTPException(status_code=400, detail="Already enrolled in this course")
 
-    return {
-        "success": True,
-        "data": EnrollmentResponse.from_orm(enrollment)
-    }
+    # Final verification and manual load if needed
+    if not enrollment.course:
+        await db.refresh(enrollment, attribute_names=['course'])
+
+    try:
+        return {
+            "success": True,
+            "data": EnrollmentResponse.model_validate(enrollment)
+        }
+    except Exception as e:
+        # Fallback or detailed error
+        print(f"Enrollment serialization error: {e}")
+        # Re-fetch everything one last time
+        from app.models.course import Enrollment
+        from sqlalchemy import select
+        from sqlalchemy.orm import joinedload
+        stmt = select(Enrollment).filter(Enrollment.id == enrollment.id).options(joinedload(Enrollment.course))
+        result = await db.execute(stmt)
+        enrollment = result.scalar_one()
+        return {
+            "success": True,
+            "data": EnrollmentResponse.model_validate(enrollment)
+        }
 
 
 @router.delete("/{course_id}", response_model=dict)

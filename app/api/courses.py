@@ -12,6 +12,7 @@ from app.schemas.course import (
 from app.services.course_service import CourseService
 from app.core.security import get_current_user, require_roles, get_current_user_optional
 from app.models.user import User
+from datetime import datetime, timezone
 import uuid
 
 router = APIRouter(prefix="/api/courses", tags=["Course Management"])
@@ -74,12 +75,31 @@ async def get_course(
     course_data = CourseDetailResponse.from_orm(course).dict()
 
     # Check enrollment status if user is authenticated
+    is_staff = current_user and current_user.role in ["lecturer", "admin"]
+    now = datetime.now(timezone.utc)
+
     if current_user:
         course_data['is_enrolled'] = await CourseService.check_user_enrollment(
             db, str(current_user.id), course_id
         )
     else:
         course_data['is_enrolled'] = False
+
+    # Apply locking logic to modules and topics
+    for module in course_data.get('modules', []):
+        m_available_at = datetime.fromisoformat(module['available_at']) if isinstance(module['available_at'], str) else module['available_at']
+        module['is_locked'] = not is_staff and m_available_at and m_available_at > now
+        if module['is_locked']:
+            module['availability_message'] = f"Available on {m_available_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            module['topics'] = [] # Hide topics in locked module
+        else:
+            for topic in module.get('topics', []):
+                t_available_at = datetime.fromisoformat(topic['available_at']) if isinstance(topic['available_at'], str) else topic['available_at']
+                topic['is_locked'] = not is_staff and t_available_at and t_available_at > now
+                if topic['is_locked']:
+                    topic['availability_message'] = f"Available on {t_available_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                    topic['content'] = "Locked until scheduled time"
+                    topic['media_files'] = []
 
     return {
         "success": True,
@@ -96,6 +116,12 @@ async def create_course(
     """Create new course (Lecturer/Admin only)"""
 
     course = await CourseService.create_course(db, course_data, str(current_user.id))
+
+    if not course:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Course with code '{course_data.code}' already exists"
+        )
 
     return {
         "success": True,
@@ -155,6 +181,7 @@ async def delete_course(
 @router.get("/{course_id}/modules", response_model=dict)
 async def get_course_modules(
     course_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     """Get course modules"""
@@ -167,15 +194,22 @@ async def get_course_modules(
 
     modules = await CourseService.get_course_modules(db, course_id)
 
+    is_staff = current_user and current_user.role in ["lecturer", "admin"]
+    now = datetime.now(timezone.utc)
+
     # Convert modules to serializable format
     modules_data = []
     for module in modules:
+        is_locked = not is_staff and module.available_at and module.available_at > now
         module_data = {
             "id": str(module.id),
             "title": module.title,
             "description": module.description,
             "order": module.order,
             "course_id": str(module.course_id),
+            "available_at": module.available_at,
+            "is_locked": is_locked,
+            "availability_message": f"Available on {module.available_at.strftime('%Y-%m-%d %H:%M:%S')}" if is_locked else None,
             "topics": [],  # Don't include topics here to avoid deep nesting
             "created_at": module.created_at,
             "updated_at": module.updated_at
@@ -192,6 +226,7 @@ async def get_course_modules(
 async def get_module_topics(
     course_id: str,
     module_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     """Get module topics"""
@@ -205,9 +240,13 @@ async def get_module_topics(
 
     topics = await CourseService.get_module_topics(db, module_id)
 
+    is_staff = current_user and current_user.role in ["lecturer", "admin"]
+    now = datetime.now(timezone.utc)
+
     # Convert topics to serializable format
     topics_data = []
     for topic in topics:
+        is_locked = not is_staff and topic.available_at and topic.available_at > now
         topic_data = {
             "id": str(topic.id),
             "title": topic.title,
@@ -215,11 +254,14 @@ async def get_module_topics(
             "duration": topic.duration,
             "order": topic.order,
             "content_type": topic.content_type,
-            "content": topic.content,
-            "media_files": topic.media_files or [],
+            "content": topic.content if not is_locked else "Locked until scheduled time",
+            "media_files": topic.media_files if not is_locked else [],
             "prerequisites": topic.prerequisites or [],
             "learning_objectives": topic.learning_objectives or [],
             "module_id": str(topic.module_id),
+            "available_at": topic.available_at,
+            "is_locked": is_locked,
+            "availability_message": f"Available on {topic.available_at.strftime('%Y-%m-%d %H:%M:%S')}" if is_locked else None,
             "assessments": [],  # Placeholder for assessments
             "created_at": topic.created_at,
             "updated_at": topic.updated_at
@@ -236,6 +278,7 @@ async def get_module_topics(
 async def get_topic(
     course_id: str,
     topic_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     """Get specific topic content"""
@@ -251,6 +294,16 @@ async def get_topic(
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
+    is_staff = current_user and current_user.role in ["lecturer", "admin"]
+    now = datetime.now(timezone.utc)
+
+    is_locked = not is_staff and topic.available_at and topic.available_at > now
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"This content is locked until {topic.available_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
     # Convert to schema response
     topic_data = {
         "id": str(topic.id),
@@ -264,6 +317,8 @@ async def get_topic(
         "prerequisites": topic.prerequisites or [],
         "learning_objectives": topic.learning_objectives or [],
         "module_id": str(topic.module_id),
+        "available_at": topic.available_at,
+        "is_locked": False,
         "assessments": [],  # Placeholder for assessments
         "created_at": topic.created_at,
         "updated_at": topic.updated_at

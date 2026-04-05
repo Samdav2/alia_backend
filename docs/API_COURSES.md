@@ -143,10 +143,31 @@ GET /api/courses?page=1&limit=10&department=Computer%20Science&level=beginner&se
     ],
     "enrollment_count": 150,
     "rating": 4.5,
+        "is_active": true,
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2024-02-01T14:30:00Z"
+      }
+    ],
+    "enrollment_count": 150,
+    "rating": 4.5,
     "is_active": true,
     "created_at": "2024-01-15T10:00:00Z",
     "updated_at": "2024-02-01T14:30:00Z"
   }
+}
+```
+
+### Scheduled Content (Locked Example)
+If a module or topic is scheduled for the future, the response will include `is_locked: true` and redacted content for students:
+
+```json
+{
+  "id": "880e8400-e29b-41d4-a716-446655440000",
+  "title": "Advanced Topics",
+  "available_at": "2026-12-01T10:00:00Z",
+  "is_locked": true,
+  "availability_message": "Available on 2026-12-01 10:00:00",
+  "topics": [] // Topics are hidden if module is locked
 }
 ```
 
@@ -283,6 +304,8 @@ Content-Type: application/json
         "title": "Getting Started",
         "description": "Introduction module",
         "order": 1,
+        "available_at": "2024-01-15T10:00:00Z",
+        "is_locked": false,
         "course_id": "770e8400-e29b-41d4-a716-446655440000",
         "created_at": "2024-01-15T10:00:00Z",
         "updated_at": "2024-01-15T10:00:00Z"
@@ -312,6 +335,8 @@ Content-Type: application/json
         "description": "Installation guide",
         "duration": "30 minutes",
         "order": 1,
+        "available_at": "2024-01-15T10:00:00Z",
+        "is_locked": false,
         "content_type": "video",
         "module_id": "880e8400-e29b-41d4-a716-446655440000"
       }
@@ -337,6 +362,9 @@ Content-Type: application/json
     "title": "Installing Python",
     "description": "Complete installation guide",
     "duration": "30 minutes",
+    "available_at": "2024-01-15T10:00:00Z",
+    "is_locked": false,
+    "availability_message": "Available on 2024-01-15 10:00:00",
     "content": "Detailed content here...",
     "media_files": [],
     "assessments": [],
@@ -345,3 +373,14 @@ Content-Type: application/json
   }
 }
 ```
+
+---
+
+## 9. Content Availability Rules
+
+1. **Scheduled Release**: Both `Modules` and `Topics` can have an `available_at` timestamp.
+2. **Locking**: If the current time is before `available_at`, the content is considered "locked" for students.
+3. **Redaction**:
+   - Locked Modules: No topics are returned in the list.
+   - Locked Topics: Content is replaced with a "Locked" message, and media files are empty.
+4. **Staff Access**: Lecturers and Admins always bypass locking logic and see full content.
