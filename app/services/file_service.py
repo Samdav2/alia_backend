@@ -42,6 +42,16 @@ class FileService:
             content = file.file.read()
             buffer.write(content)
 
+        # Cast string IDs to UUIDs if necessary
+        if isinstance(uploaded_by, str):
+            uploaded_by = uuid.UUID(uploaded_by)
+        if isinstance(course_id, str):
+            course_id = uuid.UUID(course_id)
+        if isinstance(module_id, str):
+            module_id = uuid.UUID(module_id)
+        if isinstance(topic_id, str):
+            topic_id = uuid.UUID(topic_id)
+
         # Validate context associations
         if context == 'course' and not course_id:
             raise ValueError("course_id is required for course context")

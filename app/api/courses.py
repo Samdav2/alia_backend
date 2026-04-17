@@ -1,7 +1,7 @@
 """
 Course management API routes
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_db
@@ -12,6 +12,8 @@ from app.schemas.course import (
 from app.services.course_service import CourseService
 from app.core.security import get_current_user, require_roles, get_current_user_optional
 from app.models.user import User
+from app.services.file_service import FileService
+from app.config import get_settings
 from datetime import datetime, timezone
 import uuid
 
@@ -152,6 +154,60 @@ async def update_course(
         "success": True,
         "data": CourseDetailResponse.from_orm(course)
     }
+
+
+@router.post("/{course_id}/picture", response_model=dict)
+async def upload_course_picture(
+    course_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(["lecturer", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload course picture and update thumbnail (Lecturer/Admin only)"""
+
+    # Validate UUID format
+    try:
+        uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
+
+    # 1. Validate course ownership or admin status
+    course = await CourseService.get_course_by_id(db, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if current_user.role != "admin" and str(course.instructor_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to update this course")
+
+    # 2. Use FileService to save the file
+    try:
+        db_file = await FileService.save_uploaded_file(
+            db=db,
+            file=file,
+            uploaded_by=str(current_user.id),
+            context='course',
+            course_id=course_id,
+            file_type='image'
+        )
+
+        # 3. Update course thumbnail with the new file URL
+        settings = get_settings()
+        thumbnail_url = f"{settings.base_url}/api/files/download/{db_file.id}"
+
+        await CourseService.update_course_thumbnail(
+            db, course_id, thumbnail_url, str(course.instructor_id)
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "course_id": course_id,
+                "thumbnail_url": thumbnail_url,
+                "file_id": str(db_file.id)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{course_id}", response_model=dict)

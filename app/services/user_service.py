@@ -7,18 +7,30 @@ from sqlalchemy import func, select
 from app.models.user import User
 from app.schemas.user import UserUpdate
 from datetime import datetime
+import uuid
+from typing import List, Optional, Dict, Any, Union
 
 
 class UserService:
     @staticmethod
-    async def get_user_profile(db: AsyncSession, user_id: str) -> Optional[User]:
+    async def get_user_profile(db: AsyncSession, user_id: Union[str, uuid.UUID]) -> Optional[User]:
         """Async: Get user profile by ID"""
+        if isinstance(user_id, str):
+            try:
+                user_id = uuid.UUID(user_id)
+            except ValueError:
+                return None
         result = await db.execute(select(User).filter(User.id == user_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def update_user_profile(db: AsyncSession, user_id: str, user_update: UserUpdate) -> Optional[User]:
+    async def update_user_profile(db: AsyncSession, user_id: Union[str, uuid.UUID], user_update: UserUpdate) -> Optional[User]:
         """Async: Update user profile"""
+        if isinstance(user_id, str):
+            try:
+                user_id = uuid.UUID(user_id)
+            except ValueError:
+                return None
         result = await db.execute(select(User).filter(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
@@ -65,8 +77,13 @@ class UserService:
         return users, total
 
     @staticmethod
-    async def update_last_login(db: AsyncSession, user_id: str):
+    async def update_last_login(db: AsyncSession, user_id: Union[str, uuid.UUID]):
         """Async: Update user last login timestamp"""
+        if isinstance(user_id, str):
+            try:
+                user_id = uuid.UUID(user_id)
+            except ValueError:
+                return
         result = await db.execute(select(User).filter(User.id == user_id))
         user = result.scalar_one_or_none()
         if user:

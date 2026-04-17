@@ -1,7 +1,7 @@
 """
 Course management service - Async compatible
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func, or_, select, and_
@@ -48,9 +48,15 @@ class CourseService:
         return courses, total
 
     @staticmethod
-    async def get_course_by_id(db: AsyncSession, course_id: str) -> Optional[Course]:
+    async def get_course_by_id(db: AsyncSession, course_id: Union[str, uuid.UUID]) -> Optional[Course]:
         """Async: Get course by ID with all relationships loaded"""
         from app.models.course import Module, Topic
+
+        if isinstance(course_id, str):
+            try:
+                course_id = uuid.UUID(course_id)
+            except ValueError:
+                return None
 
         stmt = select(Course).filter(
             Course.id == course_id,
@@ -114,6 +120,33 @@ class CourseService:
         await db.commit()
 
         # Return with relationships loaded to avoid MissingGreenlet in Pydantic serialization
+        return await CourseService.get_course_by_id(db, course_id)
+
+    @staticmethod
+    async def update_course_thumbnail(db: AsyncSession, course_id: Union[str, uuid.UUID], thumbnail_url: str, instructor_id: Union[str, uuid.UUID]) -> Optional[Course]:
+        """Async: Update course thumbnail url"""
+        if isinstance(course_id, str):
+            try:
+                course_id = uuid.UUID(course_id)
+            except ValueError:
+                return None
+        if isinstance(instructor_id, str):
+            try:
+                instructor_id = uuid.UUID(instructor_id)
+            except ValueError:
+                return None
+
+        result = await db.execute(select(Course).filter(
+            Course.id == course_id,
+            Course.instructor_id == instructor_id
+        ))
+        course = result.scalar_one_or_none()
+
+        if not course:
+            return None
+
+        course.thumbnail = thumbnail_url
+        await db.commit()
         return await CourseService.get_course_by_id(db, course_id)
 
     @staticmethod
@@ -203,8 +236,19 @@ class CourseService:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def check_user_enrollment(db: AsyncSession, user_id: str, course_id: str) -> bool:
+    async def check_user_enrollment(db: AsyncSession, user_id: Union[str, uuid.UUID], course_id: Union[str, uuid.UUID]) -> bool:
         """Async: Check if user is enrolled in course"""
+        if isinstance(user_id, str):
+            try:
+                user_id = uuid.UUID(user_id)
+            except ValueError:
+                return False
+        if isinstance(course_id, str):
+            try:
+                course_id = uuid.UUID(course_id)
+            except ValueError:
+                return False
+
         result = await db.execute(select(Enrollment).filter(
             Enrollment.user_id == user_id,
             Enrollment.course_id == course_id

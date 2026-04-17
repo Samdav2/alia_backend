@@ -67,7 +67,7 @@ async def login(user_credentials: UserLogin, db: AsyncSession = Depends(get_db))
         )
 
     # Update last login
-    await UserService.update_last_login(db, str(user.id))
+    await UserService.update_last_login(db, user.id)
 
     # Create tokens
     access_token = AuthService.create_access_token(data={"sub": str(user.id)})

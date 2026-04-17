@@ -105,5 +105,10 @@ class AuthService:
     @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
         """Async: Get user by ID"""
+        if isinstance(user_id, str):
+            try:
+                user_id = uuid.UUID(user_id)
+            except ValueError:
+                return None
         result = await db.execute(select(User).filter(User.id == user_id))
         return result.scalar_one_or_none()

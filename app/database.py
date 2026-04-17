@@ -11,14 +11,16 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Determine if using SQLite or PostgreSQL
-is_sqlite = settings.database_url.startswith("sqlite")
+database_url = settings.database_url
+is_sqlite = database_url.startswith("sqlite")
+is_async_sqlite = database_url.startswith("sqlite+aiosqlite")
 
-if is_sqlite:
+if is_sqlite and not is_async_sqlite:
     # SQLite configuration (synchronous for development)
     from sqlalchemy.pool import StaticPool
 
     engine = create_engine(
-        settings.database_url,
+        database_url,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
         echo=settings.debug
@@ -33,9 +35,8 @@ if is_sqlite:
         engine.dispose()
         logger.info("Database engine disposed")
 else:
-    # PostgreSQL Async configuration
-    # Convert DATABASE_URL to async format if needed
-    database_url = settings.database_url
+    # PostgreSQL or Async SQLite configuration
+    # Convert DATABASE_URL to async format if needed for Postgres
     if database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     elif database_url.startswith("postgres://"):
@@ -44,14 +45,9 @@ else:
     logger.info(f"Using async database: {database_url[:30]}...")
 
     # Create async engine
-    engine = create_async_engine(
-        database_url,
-        echo=settings.debug,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        pool_size=20,
-        max_overflow=40,
-        connect_args={
+    connect_args = {}
+    if not is_async_sqlite:
+        connect_args = {
             "ssl": "prefer",
             "timeout": 30,
             "command_timeout": 30,
@@ -60,6 +56,17 @@ else:
                 "jit": "off"
             }
         }
+    else:
+        # SQLite specific connect args
+        connect_args = {}
+
+    engine = create_async_engine(
+        database_url,
+        echo=settings.debug,
+        pool_pre_ping=not is_async_sqlite,
+        # Only use these for Postgres
+        **({"pool_recycle": 300, "pool_size": 20, "max_overflow": 40} if not is_async_sqlite else {}),
+        connect_args=connect_args
     )
 
     # Create async session factory
