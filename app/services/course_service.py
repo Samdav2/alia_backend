@@ -150,18 +150,21 @@ class CourseService:
         return await CourseService.get_course_by_id(db, course_id)
 
     @staticmethod
-    async def delete_course(db: AsyncSession, course_id: str, user_role: str) -> bool:
+    async def delete_course(db: AsyncSession, course_id: str, user: User) -> bool:
         """Async: Soft delete course"""
-        if user_role != "admin":
-            return False
-
         result = await db.execute(select(Course).filter(Course.id == course_id))
         course = result.scalar_one_or_none()
-        if course:
-            course.is_active = False
-            await db.commit()
-            return True
-        return False
+
+        if not course:
+            return False
+
+        # Admin can delete any course, lecturer can only delete their own
+        if user.role != "admin" and (user.role != "lecturer" or str(course.instructor_id) != str(user.id)):
+            return False
+
+        course.is_active = False
+        await db.commit()
+        return True
 
     @staticmethod
     async def enroll_user(db: AsyncSession, user_id: str, course_id: str) -> Optional[Enrollment]:

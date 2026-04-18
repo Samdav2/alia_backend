@@ -213,10 +213,10 @@ async def upload_course_picture(
 @router.delete("/{course_id}", response_model=dict)
 async def delete_course(
     course_id: str,
-    current_user: User = Depends(require_roles(["admin"])),
+    current_user: User = Depends(require_roles(["lecturer", "admin"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete course (Admin only)"""
+    """Delete course (Lecturer/Admin only - Lecturers can only delete their own courses)"""
 
     # Validate UUID format
     try:
@@ -224,9 +224,9 @@ async def delete_course(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
 
-    success = await CourseService.delete_course(db, course_id, current_user.role)
+    success = await CourseService.delete_course(db, course_id, current_user)
     if not success:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=403, detail="Course not found or access denied")
 
     return {
         "success": True,
